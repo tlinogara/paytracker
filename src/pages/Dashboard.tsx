@@ -1,0 +1,250 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabase";
+import type { DealRow, Profile, RepMtd } from "../lib/types";
+import {
+  money,
+  moneyExact,
+  monthLabel,
+  monthStartISO,
+  nextMonthISO,
+  units,
+} from "../lib/format";
+import DealsTable from "../components/DealsTable";
+
+const DEAL_COLUMNS =
+  "deal_number, rep, contract_date, status, stock_type, customer, vehicle, " +
+  "front_gross, rep_unit_count, rep_commission, is_split_deal, salesperson, dealer";
+
+function startOfThisMonth(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+export default function Dashboard({ session }: { session: Session }) {
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileErr, setProfileErr] = useState<string | null>(null);
+  const [month, setMonth] = useState<Date>(startOfThisMonth);
+  const [mtd, setMtd] = useState<RepMtd[]>([]);
+  const [deals, setDeals] = useState<DealRow[]>([]);
+  const [selectedRep, setSelectedRep] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [dataErr, setDataErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", session.user.id)
+      .single()
+      .then(({ data, error }) => {
+        if (error) setProfileErr(error.message);
+        else setProfile(data as Profile);
+      });
+  }, [session.user.id]);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setDataErr(null);
+    const start = monthStartISO(month);
+    const end = nextMonthISO(month);
+
+    const mtdQuery = supabase
+      .from("rep_mtd")
+      .select("*")
+      .eq("month", start)
+      .order("total_commission", { ascending: false });
+
+    let dealsQuery = supabase
+      .from("deals")
+      .select(DEAL_COLUMNS)
+      .gte("contract_date", start)
+      .lt("contract_date", end)
+      .neq("rep", "")
+      .order("contract_date", { ascending: false })
+      .limit(1000);
+    if (selectedRep) dealsQuery = dealsQuery.eq("rep", selectedRep);
+
+    const [mtdRes, dealsRes] = await Promise.all([mtdQuery, dealsQuery]);
+    if (mtdRes.error) setDataErr(mtdRes.error.message);
+    else setMtd((mtdRes.data ?? []) as RepMtd[]);
+    if (dealsRes.error) setDataErr(dealsRes.error.message);
+    else setDeals((dealsRes.data ?? []) as unknown as DealRow[]);
+    setLoading(false);
+  }, [month, selectedRep]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const isManagerView = profile?.role === "manager" || profile?.role === "admin";
+
+  // Sticker scope: a single rep's row when scoped, otherwise team totals.
+  const scoped = useMemo(() => {
+    const rows = selectedRep ? mtd.filter((r) => r.rep === selectedRep) : mtd;
+    const sum = (f: (r: RepMtd) => number | null) =>
+      rows.reduce((a, r) => a + (f(r) ?? 0), 0);
+    return {
+      units: sum((r) => r.units),
+      newUnits: sum((r) => r.new_units),
+      usedUnits: sum((r) => r.used_units),
+      frontGross: sum((r) => r.front_gross_share),
+      commission: sum((r) => r.total_commission),
+      reps: rows.length,
+    };
+  }, [mtd, selectedRep]);
+
+  const atCurrentMonth =
+    monthStartISO(month) === monthStartISO(startOfThisMonth());
+
+  const scopeLabel = selectedRep
+    ? selectedRep
+    : profile?.role === "rep"
+      ? (profile.rep_name ?? "")
+      : `Team · ${scoped.reps} rep${scoped.reps === 1 ? "" : "s"}`;
+
+  return (
+    <>
+      <header className="topbar">
+        <span className="wordmark">
+          Pay<span>Track</span>
+        </span>
+        <div className="topbar-user">
+          <span className="who">
+            {profile?.full_name || profile?.email || session.user.email}
+            {profile?.role && profile.role !== "rep" ? ` · ${profile.role}` : ""}
+          </span>
+          <button
+            className="btn-ghost"
+            onClick={() => supabase.auth.signOut()}
+          >
+            Sign out
+          </button>
+        </div>
+      </header>
+
+      <main className="page">
+        {profileErr && (
+          <div className="notice">
+            Couldn't load your profile ({profileErr}). Ask payroll to check
+            your account setup.
+          </div>
+        )}
+        {profile?.role === "rep" && profile && !profile.rep_name && (
+          <div className="notice">
+            Your login isn't linked to a salesperson record yet, so no deals
+            will show. Ask payroll to link your account.
+          </div>
+        )}
+        {dataErr && <div className="notice">Couldn't load data: {dataErr}</div>}
+
+        <div className="monthbar">
+          <div className="month-nav">
+            <button
+              className="btn-step"
+              aria-label="Previous month"
+              onClick={() =>
+                setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))
+              }
+            >
+              ‹
+            </button>
+            <span className="label">{monthLabel(month)}</span>
+            <button
+              className="btn-step"
+              aria-label="Next month"
+              disabled={atCurrentMonth}
+              onClick={() =>
+                setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))
+              }
+            >
+              ›
+            </button>
+          </div>
+          {selectedRep && (
+            <button className="btn-step" style={{ width: "auto", padding: "0 12px", fontSize: 13 }} onClick={() => setSelectedRep(null)}>
+              ✕ Clear filter: {selectedRep}
+            </button>
+          )}
+        </div>
+
+        <section className="sticker" aria-label="Month summary">
+          <div className="sticker-head">
+            <span className="sticker-title">
+              {atCurrentMonth ? "Month to date" : monthLabel(month)}
+            </span>
+            <span className="sticker-sub">
+              {scopeLabel}
+              {profile?.store_name ? ` · ${profile.store_name}` : ""} · updates
+              hourly
+            </span>
+          </div>
+          <div className="sticker-body">
+            <div className="cell hero">
+              <div className="k">Commission</div>
+              <div className="v">{moneyExact(scoped.commission)}</div>
+            </div>
+            <div className="cell">
+              <div className="k">Units</div>
+              <div className="v">{units(scoped.units)}</div>
+            </div>
+            <div className="cell">
+              <div className="k">New</div>
+              <div className="v">{units(scoped.newUnits)}</div>
+            </div>
+            <div className="cell">
+              <div className="k">Used</div>
+              <div className="v">{units(scoped.usedUnits)}</div>
+            </div>
+            <div className="cell">
+              <div className="k">Front gross</div>
+              <div className="v">
+                {money(scoped.frontGross)} <small>unit-wtd</small>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {isManagerView && mtd.length > 0 && (
+          <>
+            <div className="section-head">
+              <h2>Team</h2>
+              <span className="count">tap a rep to filter deals</span>
+            </div>
+            <div>
+              {mtd.map((r) => (
+                <button
+                  key={r.rep}
+                  className={`team-row ${selectedRep === r.rep ? "active" : ""}`}
+                  onClick={() =>
+                    setSelectedRep(selectedRep === r.rep ? null : r.rep)
+                  }
+                >
+                  <span className="name">{r.rep}</span>
+                  <span className="stat">{units(r.units)} units</span>
+                  <span className="stat">
+                    <b>{money(r.total_commission)}</b>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="section-head">
+          <h2>Deals</h2>
+          <span className="count">
+            {loading ? "loading…" : `${deals.length} row(s)`}
+          </span>
+        </div>
+        {loading ? (
+          <div className="tablewrap">
+            <div className="loading">Loading deals…</div>
+          </div>
+        ) : (
+          <DealsTable deals={deals} showRep={isManagerView && !selectedRep} />
+        )}
+      </main>
+    </>
+  );
+}

@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/DealsTable.tsx","./src/lib/format.ts","./src/lib/supabase.ts","./src/lib/types.ts","./src/pages/Dashboard.tsx","./src/pages/Login.tsx","./src/pages/UpdatePassword.tsx"],"version":"5.9.3"}
