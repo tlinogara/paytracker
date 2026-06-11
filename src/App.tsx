@@ -9,6 +9,7 @@ import type { Session } from "@supabase/supabase-js";
 import { configured, supabase } from "./lib/supabase";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Enhancers from "./pages/Enhancers";
 import UpdatePassword from "./pages/UpdatePassword";
 
 export default function App() {
@@ -58,6 +59,12 @@ export default function App() {
           path="/update-password"
           element={
             session ? <UpdatePassword /> : <Navigate to="/login" replace />
+          }
+        />
+        <Route
+          path="/enhancers"
+          element={
+            session ? <Enhancers session={session} /> : <Navigate to="/login" replace />
           }
         />
         <Route

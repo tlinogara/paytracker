@@ -859,3 +859,95 @@ table.deals th button.sort.active .arrow {
   opacity: 1;
   color: var(--green);
 }
+
+/* ---------- Enhancer approvals ---------- */
+.pend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pend-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--green);
+  border-radius: 0 4px 4px 0;
+  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+
+.pend-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pend-card .name {
+  font-weight: 600;
+  font-size: 14.5px;
+}
+
+.pend-card .rule {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.pend-card .why {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.btn-approve {
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 9px 16px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-approve:hover {
+  background: #174a36;
+}
+
+.adj-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: var(--mono);
+  color: var(--ink);
+  resize: vertical;
+}
+
+.adj-form textarea:focus {
+  outline: 2px solid var(--green);
+  border-color: transparent;
+}
+
+.stock-form {
+  grid-template-columns: 1fr auto auto;
+}
+
+.btn-del.tall {
+  padding: 11px 14px;
+}
+
+@media (max-width: 900px) {
+  .stock-form {
+    grid-template-columns: 1fr;
+  }
+}

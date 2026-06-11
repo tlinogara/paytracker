@@ -50,5 +50,41 @@ export interface Adjustment {
   amount: number | null;
   pct: number | null;
   note: string | null;
+  rule_id: string | null;
   created_at: string;
+}
+
+export type EnhancerMetric =
+  | "new_units"
+  | "used_units"
+  | "total_units"
+  | "priority_units"
+  | "trades"
+  | "manual";
+
+export interface EnhancerRule {
+  id: string;
+  month: string;
+  brand: string;
+  make_pattern: string;
+  label: string;
+  pct: number;
+  metric: EnhancerMetric;
+  threshold: number;
+}
+
+export interface EnhancerStatus {
+  rule_id: string;
+  month: string;
+  brand: string;
+  label: string;
+  pct: number;
+  metric: Exclude<EnhancerMetric, "manual">;
+  threshold: number;
+  rep: string;
+  dealer: string | null;
+  metric_value: number | null;
+  brand_front_gross: number | null;
+  qualified: boolean;
+  proposed_amount: number | null;
 }

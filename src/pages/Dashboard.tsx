@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import type { Adjustment, DealRow, Profile, RepMtd } from "../lib/types";
@@ -159,6 +160,11 @@ export default function Dashboard({ session }: { session: Session }) {
           Pay<span>Track</span>
         </span>
         <div className="topbar-user">
+          {isManagerView && (
+            <Link className="btn-ghost" to="/enhancers">
+              Enhancers
+            </Link>
+          )}
           <span className="who">
             {profile?.full_name || profile?.email || session.user.email}
             {profile?.role && profile.role !== "rep" ? ` · ${profile.role}` : ""}
