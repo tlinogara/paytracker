@@ -27,6 +27,8 @@ const METRIC_LABEL: Record<EnhancerMetric, string> = {
   manual: "Manual review (not auto-counted)",
 };
 
+const ALL_BRANDS = "All brands";
+
 function startOfThisMonth(): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -38,7 +40,8 @@ export default function Enhancers({ session }: { session: Session }) {
   const [rules, setRules] = useState<EnhancerRule[]>([]);
   const [status, setStatus] = useState<EnhancerStatus[]>([]);
   const [approved, setApproved] = useState<Adjustment[]>([]);
-  const [stockCount, setStockCount] = useState(0);
+  const [stocks, setStocks] = useState<string[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -60,6 +63,13 @@ export default function Enhancers({ session }: { session: Session }) {
       .eq("id", session.user.id)
       .single()
       .then(({ data }) => setProfile((data as Profile) ?? null));
+    supabase
+      .from("brand_list")
+      .select("*")
+      .order("n", { ascending: false })
+      .then(({ data }) =>
+        setBrands(((data ?? []) as { brand: string }[]).map((b) => b.brand))
+      );
   }, [session.user.id]);
 
   const monthISO = monthStartISO(month);
@@ -88,8 +98,9 @@ export default function Enhancers({ session }: { session: Session }) {
         .not("rule_id", "is", null),
       supabase
         .from("priority_stock")
-        .select("stock_no", { count: "exact", head: true })
-        .eq("month", monthISO),
+        .select("stock_no")
+        .eq("month", monthISO)
+        .order("stock_no"),
     ]);
     const e =
       rulesRes.error || statusRes.error || apprRes.error || stockRes.error;
@@ -97,7 +108,9 @@ export default function Enhancers({ session }: { session: Session }) {
     setRules((rulesRes.data ?? []) as EnhancerRule[]);
     setStatus((statusRes.data ?? []) as EnhancerStatus[]);
     setApproved((apprRes.data ?? []) as Adjustment[]);
-    setStockCount(stockRes.count ?? 0);
+    setStocks(
+      ((stockRes.data ?? []) as { stock_no: string }[]).map((s) => s.stock_no)
+    );
     setLoading(false);
   }, [monthISO]);
 
@@ -140,15 +153,15 @@ export default function Enhancers({ session }: { session: Session }) {
     setErr(null);
     const p = Number(pct);
     const t = metric === "manual" ? 1 : Number(threshold);
-    if (!brand.trim() || !label.trim() || Number.isNaN(p) || Number.isNaN(t)) {
+    if (!brand || !label.trim() || Number.isNaN(p) || Number.isNaN(t)) {
       setErr("Brand, description, % and threshold are all required.");
       return;
     }
     setBusy(true);
     const { error } = await supabase.from("enhancer_rules").insert({
       month: monthISO,
-      brand: brand.trim(),
-      make_pattern: `%${brand.trim()}%`,
+      brand,
+      make_pattern: brand === ALL_BRANDS ? "%" : `%${brand}%`,
       label: label.trim(),
       pct: p,
       metric,
@@ -199,6 +212,17 @@ export default function Enhancers({ session }: { session: Session }) {
       setStockPaste("");
       load();
     }
+  }
+
+  async function removeStock(stock_no: string) {
+    setErr(null);
+    const { error } = await supabase
+      .from("priority_stock")
+      .delete()
+      .eq("month", monthISO)
+      .eq("stock_no", stock_no);
+    if (error) setErr(error.message);
+    else setStocks((prev) => prev.filter((s) => s !== stock_no));
   }
 
   async function clearStock() {
@@ -263,88 +287,16 @@ export default function Enhancers({ session }: { session: Session }) {
           </div>
         )}
 
-        <div className="section-head">
-          <h2>Pending approvals</h2>
-          <span className="count">
-            {loading ? "checking…" : `${pending.length} qualified, unpaid`}
-          </span>
-        </div>
-        {pending.length === 0 ? (
-          <div className="tablewrap">
-            <div className="empty">
-              {loading
-                ? "Checking qualification…"
-                : rules.length === 0
-                  ? "No rules entered for this month yet — add them below from the monthly enhancer sheet."
-                  : "Nobody newly qualified right now. Recheck after the next hourly data load."}
-            </div>
-          </div>
-        ) : (
-          <div className="pend-list">
-            {pending.map((s) => (
-              <div className="pend-card" key={`${s.rule_id}|${s.rep}`}>
-                <div className="pend-main">
-                  <span className="name">{s.rep}</span>
-                  <span className="rule">
-                    <span className="badge cat-enhancer">{s.brand}</span>{" "}
-                    {s.label}
-                  </span>
-                  <span className="why num">
-                    {units(s.metric_value)}/{units(s.threshold)}{" "}
-                    {METRIC_LABEL[s.metric].toLowerCase()} ✓ · +{s.pct}% ×{" "}
-                    {money(s.brand_front_gross)} {s.brand} gross
-                  </span>
-                </div>
-                {canEdit && (
-                  <button className="btn-approve" onClick={() => approve(s)}>
-                    Approve {moneyExact(s.proposed_amount)}
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {manualRules.length > 0 && (
-          <>
-            <div className="section-head">
-              <h2>Manual review</h2>
-              <span className="count">
-                pay these via Spiffs &amp; enhancers on the dashboard
-              </span>
-            </div>
-            <div className="tablewrap">
-              <table className="deals adj">
-                <tbody>
-                  {manualRules.map((r) => (
-                    <tr key={r.id}>
-                      <td>
-                        <span className="badge cat-enhancer">{r.brand}</span>
-                      </td>
-                      <td className="note-cell">{r.label}</td>
-                      <td className="r money pos">+{r.pct}%</td>
-                      {canEdit && (
-                        <td className="r">
-                          <button
-                            className="btn-del"
-                            onClick={() => removeRule(r.id)}
-                          >
-                            Remove
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
+        {/* ----- 1. Rules ----- */}
         <div className="section-head">
           <h2>Rules for {monthLabel(month)}</h2>
           <span className="count">{rules.length} rule(s)</span>
         </div>
+        {rules.length === 0 && !canEdit && (
+          <div className="tablewrap">
+            <div className="empty">No rules entered for this month yet.</div>
+          </div>
+        )}
         {rules.length > 0 && (
           <div className="tablewrap">
             <table className="deals adj">
@@ -388,13 +340,22 @@ export default function Enhancers({ session }: { session: Session }) {
           <form className="adj-form" onSubmit={addRule}>
             <div className="field">
               <label htmlFor="er-brand">Brand</label>
-              <input
+              <select
                 id="er-brand"
                 required
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
-                placeholder="McLaren"
-              />
+              >
+                <option value="" disabled>
+                  Choose…
+                </option>
+                {brands.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+                <option value={ALL_BRANDS}>{ALL_BRANDS}</option>
+              </select>
             </div>
             <div className="field grow">
               <label htmlFor="er-label">Rule (from the monthly sheet)</label>
@@ -449,12 +410,31 @@ export default function Enhancers({ session }: { session: Session }) {
           </form>
         )}
 
+        {/* ----- 2. Priority / magenta list ----- */}
         <div className="section-head">
           <h2>Priority / magenta list</h2>
           <span className="count">
-            {stockCount} stock number(s) loaded for {monthLabel(month)}
+            {stocks.length} stock number(s) for {monthLabel(month)}
           </span>
         </div>
+        {stocks.length > 0 && (
+          <div className="chip-list">
+            {stocks.map((s) => (
+              <span className="chip" key={s}>
+                {s}
+                {canEdit && (
+                  <button
+                    className="chip-x"
+                    aria-label={`Remove ${s}`}
+                    onClick={() => removeStock(s)}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
         {canEdit && (
           <form className="adj-form stock-form" onSubmit={addStock}>
             <div className="field grow">
@@ -463,16 +443,16 @@ export default function Enhancers({ session }: { session: Session }) {
               </label>
               <textarea
                 id="ps-paste"
-                rows={3}
+                rows={2}
                 value={stockPaste}
                 onChange={(e) => setStockPaste(e.target.value)}
-                placeholder={"26ML543 26ML517 25B6324B\n9679UC"}
+                placeholder={"26ML543 26ML517 25B6324B"}
               />
             </div>
             <button className="btn-primary slim" type="submit">
               Add to list
             </button>
-            {stockCount > 0 && (
+            {stocks.length > 0 && (
               <button
                 className="btn-del tall"
                 type="button"
@@ -482,6 +462,76 @@ export default function Enhancers({ session }: { session: Session }) {
               </button>
             )}
           </form>
+        )}
+
+        {/* ----- 3. Manual review reminders ----- */}
+        {manualRules.length > 0 && (
+          <>
+            <div className="section-head">
+              <h2>Manual review</h2>
+              <span className="count">
+                pay these via Spiffs &amp; enhancers on the dashboard
+              </span>
+            </div>
+            <div className="tablewrap">
+              <table className="deals adj">
+                <tbody>
+                  {manualRules.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        <span className="badge cat-enhancer">{r.brand}</span>
+                      </td>
+                      <td className="note-cell">{r.label}</td>
+                      <td className="r money pos">+{r.pct}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {/* ----- 4. Pending approvals (bottom) ----- */}
+        <div className="section-head">
+          <h2>Pending approvals</h2>
+          <span className="count">
+            {loading ? "checking…" : `${pending.length} qualified, unpaid`}
+          </span>
+        </div>
+        {pending.length === 0 ? (
+          <div className="tablewrap">
+            <div className="empty">
+              {loading
+                ? "Checking qualification…"
+                : rules.length === 0
+                  ? "No rules entered for this month yet — add them above from the monthly enhancer sheet."
+                  : "Nobody newly qualified right now. Recheck after the next hourly data load."}
+            </div>
+          </div>
+        ) : (
+          <div className="pend-list">
+            {pending.map((s) => (
+              <div className="pend-card" key={`${s.rule_id}|${s.rep}`}>
+                <div className="pend-main">
+                  <span className="name">{s.rep}</span>
+                  <span className="rule">
+                    <span className="badge cat-enhancer">{s.brand}</span>{" "}
+                    {s.label}
+                  </span>
+                  <span className="why num">
+                    {units(s.metric_value)}/{units(s.threshold)}{" "}
+                    {METRIC_LABEL[s.metric].toLowerCase()} ✓ · +{s.pct}% ×{" "}
+                    {money(s.brand_front_gross)} {s.brand} gross
+                  </span>
+                </div>
+                {canEdit && (
+                  <button className="btn-approve" onClick={() => approve(s)}>
+                    Approve {moneyExact(s.proposed_amount)}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </main>
     </>
