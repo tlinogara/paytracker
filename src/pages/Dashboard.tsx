@@ -16,7 +16,7 @@ import Adjustments from "../components/Adjustments";
 
 const DEAL_COLUMNS =
   "deal_number, rep, contract_date, status, stock_type, customer, vehicle, " +
-  "front_gross, rep_unit_count, rep_commission, is_split_deal, salesperson, dealer";
+  "front_gross, rep_unit_count, rep_commission, is_split_deal, salesperson, dealer, make";
 
 function startOfThisMonth(): Date {
   const now = new Date();

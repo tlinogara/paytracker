@@ -989,3 +989,8 @@ table.deals th button.sort.active .arrow {
 .chip-x:hover {
   background: var(--red-soft);
 }
+
+.badge.acq {
+  background: #ece7f5;
+  color: #5b3e96;
+}

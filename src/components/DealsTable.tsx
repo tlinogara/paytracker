@@ -135,7 +135,9 @@ export default function DealsTable({
                   <span className="veh">{d.vehicle || ""}</span>
                 </td>
                 <td>
-                  {isNew == null ? (
+                  {!d.make || !d.make.trim() ? (
+                    <span className="badge acq">Acq</span>
+                  ) : isNew == null ? (
                     "—"
                   ) : (
                     <span className={`badge ${isNew ? "new" : "used"}`}>
