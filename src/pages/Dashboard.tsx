@@ -30,6 +30,7 @@ export default function Dashboard({ session }: { session: Session }) {
   const [deals, setDeals] = useState<DealRow[]>([]);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [selectedRep, setSelectedRep] = useState<string | null>(null);
+  const [showAllReps, setShowAllReps] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dataErr, setDataErr] = useState<string | null>(null);
 
@@ -282,25 +283,34 @@ export default function Dashboard({ session }: { session: Session }) {
           <>
             <div className="section-head">
               <h2>Team</h2>
-              <span className="count">tap a rep to filter deals</span>
+              <span className="count">tap a rep to filter</span>
             </div>
-            <div>
-              {mtd.map((r) => (
+            <div className="team-grid">
+              {(showAllReps ? mtd : mtd.slice(0, 9)).map((r) => (
                 <button
                   key={r.rep}
-                  className={`team-row ${selectedRep === r.rep ? "active" : ""}`}
+                  className={`team-card ${selectedRep === r.rep ? "active" : ""}`}
                   onClick={() =>
                     setSelectedRep(selectedRep === r.rep ? null : r.rep)
                   }
                 >
                   <span className="name">{r.rep}</span>
-                  <span className="stat">{units(r.units)} units</span>
-                  <span className="stat">
-                    <b>{money(r.total_commission)}</b>
+                  <span className="meta">
+                    {units(r.units)} u · <b>{money(r.total_commission)}</b>
                   </span>
                 </button>
               ))}
             </div>
+            {mtd.length > 9 && (
+              <button
+                className="btn-showall"
+                onClick={() => setShowAllReps((v) => !v)}
+              >
+                {showAllReps
+                  ? "Show fewer"
+                  : `Show all ${mtd.length} reps`}
+              </button>
+            )}
           </>
         )}
 
