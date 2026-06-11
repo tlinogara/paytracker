@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
-import type { DealRow, Profile, RepMtd } from "../lib/types";
+import type { Adjustment, DealRow, Profile, RepMtd } from "../lib/types";
 import {
   money,
   moneyExact,
@@ -11,6 +11,7 @@ import {
   units,
 } from "../lib/format";
 import DealsTable from "../components/DealsTable";
+import Adjustments from "../components/Adjustments";
 
 const DEAL_COLUMNS =
   "deal_number, rep, contract_date, status, stock_type, customer, vehicle, " +
@@ -27,6 +28,7 @@ export default function Dashboard({ session }: { session: Session }) {
   const [month, setMonth] = useState<Date>(startOfThisMonth);
   const [mtd, setMtd] = useState<RepMtd[]>([]);
   const [deals, setDeals] = useState<DealRow[]>([]);
+  const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [selectedRep, setSelectedRep] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dataErr, setDataErr] = useState<string | null>(null);
@@ -65,11 +67,24 @@ export default function Dashboard({ session }: { session: Session }) {
       .limit(1000);
     if (selectedRep) dealsQuery = dealsQuery.eq("rep", selectedRep);
 
-    const [mtdRes, dealsRes] = await Promise.all([mtdQuery, dealsQuery]);
+    let adjQuery = supabase
+      .from("adjustments")
+      .select("*")
+      .eq("month", start)
+      .order("created_at", { ascending: false });
+    if (selectedRep) adjQuery = adjQuery.eq("rep", selectedRep);
+
+    const [mtdRes, dealsRes, adjRes] = await Promise.all([
+      mtdQuery,
+      dealsQuery,
+      adjQuery,
+    ]);
     if (mtdRes.error) setDataErr(mtdRes.error.message);
     else setMtd((mtdRes.data ?? []) as RepMtd[]);
     if (dealsRes.error) setDataErr(dealsRes.error.message);
     else setDeals((dealsRes.data ?? []) as unknown as DealRow[]);
+    if (adjRes.error) setDataErr(adjRes.error.message);
+    else setAdjustments((adjRes.data ?? []) as Adjustment[]);
     setLoading(false);
   }, [month, selectedRep]);
 
@@ -93,6 +108,39 @@ export default function Dashboard({ session }: { session: Session }) {
       reps: rows.length,
     };
   }, [mtd, selectedRep]);
+
+  const fgsByRep = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of mtd) m.set(r.rep, r.front_gross_share ?? 0);
+    return m;
+  }, [mtd]);
+
+  const overlay = useMemo(() => {
+    let flat = 0;
+    let enhancer = 0;
+    let pctTotal = 0;
+    for (const a of adjustments) {
+      if (a.pct == null) flat += a.amount ?? 0;
+      else {
+        pctTotal += a.pct;
+        enhancer += (a.pct / 100) * (fgsByRep.get(a.rep) ?? 0);
+      }
+    }
+    enhancer = Math.round(enhancer * 100) / 100;
+    flat = Math.round(flat * 100) / 100;
+    return { flat, enhancer, pctTotal, any: adjustments.length > 0 };
+  }, [adjustments, fgsByRep]);
+
+  const projected =
+    Math.round((scoped.commission + overlay.flat + overlay.enhancer) * 100) /
+    100;
+
+  const singleRepScope = Boolean(selectedRep) || profile?.role === "rep";
+
+  const formStore =
+    profile?.store_name ||
+    (selectedRep ? mtd.find((r) => r.rep === selectedRep)?.dealer ?? null : null) ||
+    (mtd.length > 0 ? mtd[0].dealer : null);
 
   const atCurrentMonth =
     monthStartISO(month) === monthStartISO(startOfThisMonth());
@@ -181,8 +229,12 @@ export default function Dashboard({ session }: { session: Session }) {
           </div>
           <div className="sticker-body">
             <div className="cell hero">
-              <div className="k">Commission</div>
-              <div className="v">{moneyExact(scoped.commission)}</div>
+              <div className="k">
+                {overlay.any ? "Projected pay" : "Commission"}
+              </div>
+              <div className="v">
+                {moneyExact(overlay.any ? projected : scoped.commission)}
+              </div>
             </div>
             <div className="cell">
               <div className="k">Units</div>
@@ -203,6 +255,27 @@ export default function Dashboard({ session }: { session: Session }) {
               </div>
             </div>
           </div>
+          {overlay.any && (
+            <div className="sticker-breakdown">
+              <div className="bcell">
+                <span className="k">Deal commission</span>
+                <span className="v">{moneyExact(scoped.commission)}</span>
+              </div>
+              <div className="bcell">
+                <span className="k">Spiffs &amp; corrections</span>
+                <span className="v">{moneyExact(overlay.flat)}</span>
+              </div>
+              <div className="bcell">
+                <span className="k">
+                  Enhancers
+                  {singleRepScope && overlay.pctTotal > 0
+                    ? ` (+${overlay.pctTotal}%)`
+                    : ""}
+                </span>
+                <span className="v">{moneyExact(overlay.enhancer)}</span>
+              </div>
+            </div>
+          )}
         </section>
 
         {isManagerView && mtd.length > 0 && (
@@ -228,6 +301,30 @@ export default function Dashboard({ session }: { session: Session }) {
                 </button>
               ))}
             </div>
+          </>
+        )}
+
+        {(isManagerView || adjustments.length > 0) && (
+          <>
+            <div className="section-head">
+              <h2>Spiffs &amp; enhancers</h2>
+              <span className="count">
+                {isManagerView
+                  ? "manual entries on top of the deal log"
+                  : "entered by your manager or payroll"}
+              </span>
+            </div>
+            <Adjustments
+              key={`${monthStartISO(month)}-${selectedRep ?? "all"}`}
+              entries={adjustments}
+              canEdit={isManagerView}
+              monthISO={monthStartISO(month)}
+              reps={mtd.map((r) => r.rep)}
+              fgsByRep={fgsByRep}
+              defaultStore={formStore}
+              selectedRep={selectedRep}
+              onChanged={loadData}
+            />
           </>
         )}
 

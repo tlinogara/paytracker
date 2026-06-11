@@ -55,10 +55,28 @@ run query 5 in `reconciliation.sql` to see Tekion's exact spelling.
 | manager | team totals for their store | their store's reps (tap to filter) | their store |
 | admin | totals across everything visible | all reps | all stores |
 
-## Phase 3 candidates
+## Spiffs, corrections & enhancers (Phase 3)
 
-- Spiff/enhancer breakdown per deal (needs a per-rep spiff column from the
-  cleaner, or an enhancers table + calc step)
+Manual money never touches the `deals` table (the hourly loader would
+overwrite it). It lives in `adjustments` — run `phase3_adjustments.sql`
+in the Supabase SQL Editor to create it.
+
+- **Managers and admins** get a "Spiffs & enhancers" section on the
+  dashboard: add a flat dollar amount (spiff / correction / other) or an
+  enhancer **percentage**, optionally tied to a deal number, with a note.
+  Managers can only write entries for their own store; reps can only read
+  their own. Every entry records who created it.
+- **Percentages** are computed as pct × the rep's unit-weighted front gross
+  for that month. Verify this against payroll's hand-calc the first month;
+  if the pay plan uses a different base, enter flat dollar amounts instead.
+- The summary panel shows **Projected pay = deal commission + spiffs &
+  corrections + enhancers** with the breakdown underneath.
+- Payroll's period-end numbers: query the `rep_month_pay` view, plus
+  `select * from adjustments where month = '2026-06-01'` for the audit trail.
+
+## Later candidates
+
+- Auto-qualification of enhancers from the monthly criteria lists
 - Manager pay plans (paid off different gross — data is already stored)
 - Pay-period (vs calendar month) date ranges
-- CSV export for payroll
+- CSV export button for payroll

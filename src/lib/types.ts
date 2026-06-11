@@ -37,3 +37,18 @@ export interface DealRow {
   salesperson: string | null;
   dealer: string | null;
 }
+
+export type AdjCategory = "spiff" | "enhancer" | "correction" | "other";
+
+export interface Adjustment {
+  id: string;
+  rep: string;
+  store: string;
+  month: string; // ISO first-of-month
+  deal_number: string | null;
+  category: AdjCategory;
+  amount: number | null;
+  pct: number | null;
+  note: string | null;
+  created_at: string;
+}
