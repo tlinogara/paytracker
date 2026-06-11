@@ -36,6 +36,7 @@ export interface DealRow {
   is_split_deal: boolean | null;
   salesperson: string | null;
   dealer: string | null;
+  make: string | null;
 }
 
 export type AdjCategory = "spiff" | "enhancer" | "correction" | "other";
@@ -60,6 +61,8 @@ export type EnhancerMetric =
   | "total_units"
   | "priority_units"
   | "trades"
+  | "acquisitions"
+  | "acq_trades_combined"
   | "manual";
 
 export interface EnhancerRule {

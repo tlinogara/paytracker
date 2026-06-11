@@ -24,6 +24,8 @@ const METRIC_LABEL: Record<EnhancerMetric, string> = {
   total_units: "Total units sold",
   priority_units: "Priority-list units sold",
   trades: "Trade-ins taken",
+  acquisitions: "Acquisitions",
+  acq_trades_combined: "Acquisitions + trade-ins",
   manual: "Manual review (not auto-counted)",
 };
 
@@ -379,6 +381,10 @@ export default function Enhancers({ session }: { session: Session }) {
                 <option value="total_units">Total units</option>
                 <option value="priority_units">Priority-list units</option>
                 <option value="trades">Trade-ins</option>
+                <option value="acquisitions">Acquisitions</option>
+                <option value="acq_trades_combined">
+                  Acquisitions + trade-ins
+                </option>
                 <option value="manual">Manual review</option>
               </select>
             </div>
