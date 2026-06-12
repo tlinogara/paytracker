@@ -118,16 +118,31 @@ export default function Dashboard({ session }: { session: Session }) {
     let enhancer = 0;
     let pctTotal = 0;
     for (const a of adjustments) {
-      if (a.pct == null) flat += a.amount ?? 0;
-      else {
+      if (a.pct != null) {
+        // Percentage entries are enhancer-style by definition
         pctTotal += a.pct;
         enhancer += (a.pct / 100) * (fgsByRep.get(a.rep) ?? 0);
+      } else if (a.category === "enhancer") {
+        // Flat enhancers (incl. one-click approvals) belong here
+        enhancer += a.amount ?? 0;
+      } else {
+        flat += a.amount ?? 0;
       }
     }
     enhancer = Math.round(enhancer * 100) / 100;
     flat = Math.round(flat * 100) / 100;
     return { flat, enhancer, pctTotal, any: adjustments.length > 0 };
   }, [adjustments, fgsByRep]);
+
+  const acqUnits = useMemo(
+    () =>
+      deals.reduce(
+        (a, d) =>
+          a + (!d.make || !d.make.trim() ? (d.rep_unit_count ?? 0) : 0),
+        0
+      ),
+    [deals]
+  );
 
   const projected =
     Math.round((scoped.commission + overlay.flat + overlay.enhancer) * 100) /
@@ -252,6 +267,10 @@ export default function Dashboard({ session }: { session: Session }) {
               <div className="v">{units(scoped.usedUnits)}</div>
             </div>
             <div className="cell">
+              <div className="k">Acq</div>
+              <div className="v">{units(acqUnits)}</div>
+            </div>
+            <div className="cell">
               <div className="k">Front gross</div>
               <div className="v">
                 {money(scoped.frontGross)} <small>unit-wtd</small>
@@ -288,7 +307,7 @@ export default function Dashboard({ session }: { session: Session }) {
               <span className="count">tap a rep to filter</span>
             </div>
             <div className="team-grid">
-              {(showAllReps ? mtd : mtd.slice(0, 9)).map((r) => (
+              {(showAllReps ? mtd : mtd.slice(0, 8)).map((r) => (
                 <button
                   key={r.rep}
                   className={`team-card ${selectedRep === r.rep ? "active" : ""}`}
@@ -303,7 +322,7 @@ export default function Dashboard({ session }: { session: Session }) {
                 </button>
               ))}
             </div>
-            {mtd.length > 9 && (
+            {mtd.length > 8 && (
               <button
                 className="btn-showall"
                 onClick={() => setShowAllReps((v) => !v)}
