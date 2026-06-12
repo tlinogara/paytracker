@@ -34,7 +34,7 @@ const ALL_BRANDS = "All brands";
 
 export default function Enhancers({ session }: { session: Session }) {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const { month, setMonth, isCurrentMonth } = useMonth();
+  const { month, monthParam, setMonth, isCurrentMonth } = useMonth();
   const [rules, setRules] = useState<EnhancerRule[]>([]);
   const [status, setStatus] = useState<EnhancerStatus[]>([]);
   const [approved, setApproved] = useState<Adjustment[]>([]);
@@ -244,7 +244,7 @@ export default function Enhancers({ session }: { session: Session }) {
         <div className="topbar-user">
           <Link
             className="btn-ghost"
-            to={`/${isCurrentMonth ? "" : `?month=${monthISO.slice(0, 7)}`}`}
+            to={`/${isCurrentMonth ? "" : `?month=${monthParam}`}`}
           >
             Dashboard
           </Link>
