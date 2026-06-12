@@ -62,7 +62,7 @@ export type EnhancerMetric =
   | "priority_units"
   | "trades"
   | "acquisitions"
-  | "acq_trades_combined"
+  | "trades_acquisitions"
   | "manual";
 
 export interface EnhancerRule {
