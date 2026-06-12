@@ -131,8 +131,15 @@ export default function Dashboard({ session }: { session: Session }) {
     }
     enhancer = Math.round(enhancer * 100) / 100;
     flat = Math.round(flat * 100) / 100;
-    return { flat, enhancer, pctTotal, any: adjustments.length > 0 };
-  }, [adjustments, fgsByRep]);
+    // Effective enhancer rate = total enhancer $ / front gross, like
+    // CompTrackr's "Enhancers %". Works regardless of how each enhancer
+    // was entered (%, flat approval, or flat-cash rule).
+    const effectivePct =
+      scoped.frontGross > 0
+        ? Math.round((enhancer / scoped.frontGross) * 1000) / 10
+        : 0;
+    return { flat, enhancer, pctTotal, effectivePct, any: adjustments.length > 0 };
+  }, [adjustments, fgsByRep, scoped.frontGross]);
 
   const acqUnits = useMemo(
     () =>
@@ -148,7 +155,6 @@ export default function Dashboard({ session }: { session: Session }) {
     Math.round((scoped.commission + overlay.flat + overlay.enhancer) * 100) /
     100;
 
-  const singleRepScope = Boolean(selectedRep) || profile?.role === "rep";
 
   const formStore =
     profile?.store_name ||
@@ -290,9 +296,7 @@ export default function Dashboard({ session }: { session: Session }) {
               <div className="bcell">
                 <span className="k">
                   Enhancers
-                  {singleRepScope && overlay.pctTotal > 0
-                    ? ` (+${overlay.pctTotal}%)`
-                    : ""}
+                  {overlay.effectivePct > 0 ? ` (${overlay.effectivePct}%)` : ""}
                 </span>
                 <span className="v">{moneyExact(overlay.enhancer)}</span>
               </div>
