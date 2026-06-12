@@ -175,7 +175,7 @@ const load = useCallback(async () => {
   );
   const manualRules = rules.filter((r) => r.metric === "manual");
 
-  async function approve(s: EnhancerStatus) {
+async function approve(s: EnhancerStatus) {
     setErr(null);
     const amount = s.proposed_amount ?? 0;
     const note =
@@ -198,6 +198,7 @@ const load = useCallback(async () => {
     if (error) setErr(error.message);
     else load();
   }
+
   async function approveManual(r: EnhancerRule) {
     setErr(null);
     const rep = manualRep[r.id];
@@ -253,7 +254,7 @@ const load = useCallback(async () => {
       setThreshold("");
       load();
     }
-  }
+  }  
 
   async function removeRule(id: string) {
     setErr(null);
