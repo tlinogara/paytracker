@@ -69,6 +69,8 @@ export default function Enhancers({ session }: { session: Session }) {
   const [brands, setBrands] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [mtdReps, setMtdReps] = useState<{ rep: string; dealer: string | null }[]>([]);
+  const [manualRep, setManualRep] = useState<Record<string, string>>({});
 
   // Rule form
   const [brand, setBrand] = useState("");
@@ -103,10 +105,10 @@ export default function Enhancers({ session }: { session: Session }) {
 
   const monthISO = monthStartISO(month);
 
-  const load = useCallback(async () => {
+const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
-    const [rulesRes, statusRes, apprRes, stockRes] = await Promise.all([
+    const [rulesRes, statusRes, apprRes, stockRes, repRes] = await Promise.all([
       supabase
         .from("enhancer_rules")
         .select("*")
@@ -130,9 +132,14 @@ export default function Enhancers({ session }: { session: Session }) {
         .select("stock_no")
         .eq("month", monthISO)
         .order("stock_no"),
+      supabase
+        .from("rep_mtd")
+        .select("rep, dealer")
+        .eq("month", monthISO)
+        .order("rep"),
     ]);
     const e =
-      rulesRes.error || statusRes.error || apprRes.error || stockRes.error;
+      rulesRes.error || statusRes.error || apprRes.error || stockRes.error || repRes.error;
     if (e) setErr(e.message);
     setRules((rulesRes.data ?? []) as EnhancerRule[]);
     setStatus((statusRes.data ?? []) as EnhancerStatus[]);
@@ -140,6 +147,7 @@ export default function Enhancers({ session }: { session: Session }) {
     setStocks(
       ((stockRes.data ?? []) as { stock_no: string }[]).map((s) => s.stock_no)
     );
+    setMtdReps((repRes.data ?? []) as { rep: string; dealer: string | null }[]);
     setLoading(false);
   }, [monthISO]);
 
@@ -157,7 +165,7 @@ export default function Enhancers({ session }: { session: Session }) {
   );
   const manualRules = rules.filter((r) => r.metric === "manual");
 
-  async function approve(s: EnhancerStatus) {
+async function approve(s: EnhancerStatus) {
     setErr(null);
     const amount = s.proposed_amount ?? 0;
     const note =
@@ -176,6 +184,34 @@ export default function Enhancers({ session }: { session: Session }) {
       rate_pct: s.flat_amount != null ? null : s.pct,
       note,
       rule_id: s.rule_id,
+    });
+    if (error) setErr(error.message);
+    else load();
+  }
+
+  async function approveManual(r: EnhancerRule) {
+    setErr(null);
+    const rep = manualRep[r.id];
+    if (!rep) {
+      setErr("Pick a salesperson for that rule first.");
+      return;
+    }
+    if (approvedKeys.has(`${r.id}|${rep}`)) {
+      setErr(`${rep} already has an approved entry for that rule this month. Remove it from the dashboard first if you need to redo it.`);
+      return;
+    }
+    const dealer = mtdReps.find((m) => m.rep === rep)?.dealer;
+    const isFlat = r.flat_amount != null;
+    const { error } = await supabase.from("adjustments").insert({
+      rep,
+      store: dealer ?? profile?.store_name ?? "unknown",
+      month: monthISO,
+      category: "enhancer",
+      amount: isFlat ? r.flat_amount : null,
+      pct: isFlat ? null : r.pct,
+      rate_pct: null,
+      note: `${r.brand}: ${r.label} (manual review approved)`,
+      rule_id: r.id,
     });
     if (error) setErr(error.message);
     else load();
@@ -208,7 +244,7 @@ export default function Enhancers({ session }: { session: Session }) {
       setThreshold("");
       load();
     }
-  }
+  }  
 
   async function removeRule(id: string) {
     setErr(null);
@@ -779,11 +815,22 @@ export default function Enhancers({ session }: { session: Session }) {
             <div className="section-head">
               <h2>Manual review</h2>
               <span className="count">
-                pay these via Spiffs &amp; enhancers on the dashboard
+                {canEdit
+                  ? "pick a rep and approve to pay"
+                  : "reviewed and paid by managers"}
               </span>
             </div>
             <div className="tablewrap">
               <table className="deals adj">
+                <thead>
+                  <tr>
+                    <th>Brand</th>
+                    <th>Rule</th>
+                    <th className="r">Rate</th>
+                    {canEdit && <th>Salesperson</th>}
+                    {canEdit && <th></th>}
+                  </tr>
+                </thead>
                 <tbody>
                   {manualRules.map((r) => (
                     <tr key={r.id}>
@@ -791,7 +838,43 @@ export default function Enhancers({ session }: { session: Session }) {
                         <span className="badge cat-enhancer">{r.brand}</span>
                       </td>
                       <td className="note-cell">{r.label}</td>
-                      <td className="r money pos">+{r.pct}%</td>
+                      <td className="r money pos">
+                        {r.flat_amount != null
+                          ? moneyExact(r.flat_amount)
+                          : `+${r.pct}%`}
+                      </td>
+                      {canEdit && (
+                        <td>
+                          <select
+                            value={manualRep[r.id] ?? ""}
+                            onChange={(e) =>
+                              setManualRep((p) => ({
+                                ...p,
+                                [r.id]: e.target.value,
+                              }))
+                            }
+                          >
+                            <option value="" disabled>
+                              Choose…
+                            </option>
+                            {mtdReps.map((m) => (
+                              <option key={m.rep} value={m.rep}>
+                                {m.rep}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      )}
+                      {canEdit && (
+                        <td className="r">
+                          <button
+                            className="btn-approve"
+                            onClick={() => approveManual(r)}
+                          >
+                            Approve
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
