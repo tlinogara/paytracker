@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
+import { useMonth } from "../lib/useMonth";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import type {
@@ -31,14 +32,9 @@ const METRIC_LABEL: Record<EnhancerMetric, string> = {
 
 const ALL_BRANDS = "All brands";
 
-function startOfThisMonth(): Date {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
-}
-
 export default function Enhancers({ session }: { session: Session }) {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [month, setMonth] = useState<Date>(startOfThisMonth);
+  const { month, setMonth, isCurrentMonth } = useMonth();
   const [rules, setRules] = useState<EnhancerRule[]>([]);
   const [status, setStatus] = useState<EnhancerStatus[]>([]);
   const [approved, setApproved] = useState<Adjustment[]>([]);
@@ -246,7 +242,10 @@ export default function Enhancers({ session }: { session: Session }) {
           Pay<span>Track</span>
         </span>
         <div className="topbar-user">
-          <Link className="btn-ghost" to="/">
+          <Link
+            className="btn-ghost"
+            to={`/${isCurrentMonth ? "" : `?month=${monthISO.slice(0, 7)}`}`}
+          >
             Dashboard
           </Link>
           <button className="btn-ghost" onClick={() => supabase.auth.signOut()}>
@@ -271,7 +270,7 @@ export default function Enhancers({ session }: { session: Session }) {
             <button
               className="btn-step"
               aria-label="Next month"
-              disabled={monthISO === monthStartISO(startOfThisMonth())}
+              disabled={isCurrentMonth}
               onClick={() =>
                 setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))
               }

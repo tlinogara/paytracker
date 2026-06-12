@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useMonth } from "../lib/useMonth";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import type { Adjustment, DealRow, Profile, RepMtd } from "../lib/types";
@@ -18,15 +19,10 @@ const DEAL_COLUMNS =
   "deal_number, rep, contract_date, status, stock_type, customer, vehicle, " +
   "front_gross, rep_unit_count, rep_commission, is_split_deal, salesperson, dealer, make";
 
-function startOfThisMonth(): Date {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
-}
-
 export default function Dashboard({ session }: { session: Session }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileErr, setProfileErr] = useState<string | null>(null);
-  const [month, setMonth] = useState<Date>(startOfThisMonth);
+  const { month, setMonth, isCurrentMonth } = useMonth();
   const [mtd, setMtd] = useState<RepMtd[]>([]);
   const [deals, setDeals] = useState<DealRow[]>([]);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
@@ -144,9 +140,6 @@ export default function Dashboard({ session }: { session: Session }) {
     (selectedRep ? mtd.find((r) => r.rep === selectedRep)?.dealer ?? null : null) ||
     (mtd.length > 0 ? mtd[0].dealer : null);
 
-  const atCurrentMonth =
-    monthStartISO(month) === monthStartISO(startOfThisMonth());
-
   const scopeLabel = selectedRep
     ? selectedRep
     : profile?.role === "rep"
@@ -161,7 +154,10 @@ export default function Dashboard({ session }: { session: Session }) {
         </span>
         <div className="topbar-user">
           {isManagerView && (
-            <Link className="btn-ghost" to="/enhancers">
+            <Link
+              className="btn-ghost"
+              to={`/enhancers${isCurrentMonth ? "" : `?month=${monthStartISO(month).slice(0, 7)}`}`}
+            >
               Enhancers
             </Link>
           )}
@@ -208,7 +204,7 @@ export default function Dashboard({ session }: { session: Session }) {
             <button
               className="btn-step"
               aria-label="Next month"
-              disabled={atCurrentMonth}
+              disabled={isCurrentMonth}
               onClick={() =>
                 setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))
               }
@@ -226,7 +222,7 @@ export default function Dashboard({ session }: { session: Session }) {
         <section className="sticker" aria-label="Month summary">
           <div className="sticker-head">
             <span className="sticker-title">
-              {atCurrentMonth ? "Month to date" : monthLabel(month)}
+              {isCurrentMonth ? "Month to date" : monthLabel(month)}
             </span>
             <span className="sticker-sub">
               {scopeLabel}
