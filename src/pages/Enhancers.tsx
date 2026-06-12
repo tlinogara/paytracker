@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { useMonth } from "../lib/useMonth";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import { parseEnhancerText } from "../lib/parseEnhancers";
+import type { DraftRule } from "../lib/parseEnhancers";
 import type {
   Adjustment,
   EnhancerMetric,
@@ -32,51 +34,6 @@ const METRIC_LABEL: Record<EnhancerMetric, string> = {
 
 const ALL_BRANDS = "All brands";
 
-// Derived from the May 2026 BH enhancer sheet. Auto-countable rules use real
-// metrics; rules the data can't see are metric "manual" so they appear as
-// reminders. Stock numbers are NOT in the template (the magenta list changes
-// monthly) — paste them separately each month.
-const BH_TEMPLATE: Array<{
-  brand: string;
-  make_pattern: string;
-  label: string;
-  pct: number;
-  metric: EnhancerMetric;
-  threshold: number;
-}> = [
-  // McLaren
-  { brand: "McLaren", make_pattern: "%mclaren%", label: "Sell 2 used McLaren including LBO", pct: 3, metric: "used_units", threshold: 2 },
-  { brand: "McLaren", make_pattern: "%mclaren%", label: "4 trade-ins, acquisitions or consignments (consignments count manually)", pct: 3, metric: "trades_acquisitions", threshold: 4 },
-  { brand: "McLaren", make_pattern: "%mclaren%", label: "Sell 2+ cars from the priority (magenta) list", pct: 2, metric: "priority_units", threshold: 2 },
-  { brand: "McLaren", make_pattern: "%mclaren%", label: "Up to 2%: previous client 1.5% / orphaned client 0.5%", pct: 2, metric: "manual", threshold: 1 },
-  { brand: "McLaren", make_pattern: "%mclaren%", label: "$2,000 flat per acquisition (pay as spiff)", pct: 0, metric: "manual", threshold: 1 },
-  { brand: "McLaren", make_pattern: "%mclaren%", label: "+1.25% per new/prev-demo McLaren sold, up to 6.25% (all sales personnel)", pct: 1.25, metric: "manual", threshold: 1 },
-  // Aston Martin
-  { brand: "Aston Martin", make_pattern: "%aston%", label: "2 acquisitions/trades/consignments", pct: 2, metric: "trades_acquisitions", threshold: 2 },
-  { brand: "Aston Martin", make_pattern: "%aston%", label: "Sell 2 pre-owned Aston Martins (off-brand pre-owned count manually)", pct: 2, metric: "used_units", threshold: 2 },
-  { brand: "Aston Martin", make_pattern: "%aston%", label: "Sell 3 new Aston Martins", pct: 3, metric: "new_units", threshold: 3 },
-  { brand: "Aston Martin", make_pattern: "%aston%", label: "Sell 2+ cars from the priority list", pct: 1, metric: "priority_units", threshold: 2 },
-  { brand: "Aston Martin", make_pattern: "%aston%", label: "Up to 2%: previous client 1.5% / orphaned client 0.5%", pct: 2, metric: "manual", threshold: 1 },
-  // Rolls-Royce
-  { brand: "Rolls-Royce", make_pattern: "%rolls%", label: "Sell 3 new Rolls-Royce", pct: 3, metric: "new_units", threshold: 3 },
-  { brand: "Rolls-Royce", make_pattern: "%rolls%", label: "Sell 3 used Rolls-Royce including LBO", pct: 3, metric: "used_units", threshold: 3 },
-  { brand: "Rolls-Royce", make_pattern: "%rolls%", label: "3 RR acquisitions (or 3 new orders w/ deposits — orders path manual)", pct: 1, metric: "acquisitions", threshold: 3 },
-  { brand: "Rolls-Royce", make_pattern: "%rolls%", label: "Time clock + RR SF compliance package", pct: 1, metric: "manual", threshold: 1 },
-  { brand: "Rolls-Royce", make_pattern: "%rolls%", label: "Month-end: highest avg GP (1%) + most used units (1%) — UCM results", pct: 2, metric: "manual", threshold: 1 },
-  // Lamborghini
-  { brand: "Lamborghini", make_pattern: "%lamborghini%", label: "5 acquisitions, trades or consignments", pct: 1.25, metric: "trades_acquisitions", threshold: 5 },
-  { brand: "Lamborghini", make_pattern: "%lamborghini%", label: "Sell 3 pre-owned Lamborghini", pct: 1.25, metric: "used_units", threshold: 3 },
-  { brand: "Lamborghini", make_pattern: "%lamborghini%", label: "OR sell 1 magenta (priority-list) car", pct: 1.25, metric: "priority_units", threshold: 1 },
-  { brand: "Lamborghini", make_pattern: "%lamborghini%", label: "Meet/exceed YTD accessory targets", pct: 1.25, metric: "manual", threshold: 1 },
-  { brand: "Lamborghini", make_pattern: "%lamborghini%", label: "Collect 3 Lamborghini deposits", pct: 2.25, metric: "manual", threshold: 1 },
-  { brand: "Lamborghini", make_pattern: "%lamborghini%", label: "Unica activations: <25% non-activated / 75% successful", pct: 2, metric: "manual", threshold: 1 },
-  { brand: "Lamborghini", make_pattern: "%lamborghini%", label: "Up to 2%: previous client 1.5% / orphaned client 0.5%", pct: 2, metric: "manual", threshold: 1 },
-  // Bentley
-  { brand: "Bentley", make_pattern: "%bentley%", label: "Sell 4 NEW Bentleys", pct: 4, metric: "new_units", threshold: 4 },
-  { brand: "Bentley", make_pattern: "%bentley%", label: "Sell 3 pre-owned Bentleys", pct: 2, metric: "used_units", threshold: 3 },
-  { brand: "Bentley", make_pattern: "%bentley%", label: "4 acquisitions, trades or consignments", pct: 2, metric: "trades_acquisitions", threshold: 4 },
-  { brand: "Bentley", make_pattern: "%bentley%", label: "Sell 2+ cars from the priority (magenta) list", pct: 2, metric: "priority_units", threshold: 2 },
-];
 
 export default function Enhancers({ session }: { session: Session }) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -99,6 +56,10 @@ export default function Enhancers({ session }: { session: Session }) {
 
   // Priority stock form
   const [stockPaste, setStockPaste] = useState("");
+
+  // Paste-and-parse assist
+  const [pasteText, setPasteText] = useState("");
+  const [drafts, setDrafts] = useState<DraftRule[] | null>(null);
 
   useEffect(() => {
     supabase
@@ -236,14 +197,26 @@ export default function Enhancers({ session }: { session: Session }) {
     else load();
   }
 
-  async function loadTemplate() {
+  async function saveDrafts(rows: DraftRule[]) {
     setErr(null);
     setBusy(true);
-    const rows = BH_TEMPLATE.map((t) => ({ ...t, month: monthISO }));
-    const { error } = await supabase.from("enhancer_rules").insert(rows);
+    const payload = rows.map((d) => ({
+      month: monthISO,
+      brand: d.brand,
+      make_pattern: d.brand === ALL_BRANDS ? "%" : `%${d.brand}%`,
+      label: d.label,
+      pct: d.pct ?? 0,
+      metric: d.metric,
+      threshold: d.threshold,
+    }));
+    const { error } = await supabase.from("enhancer_rules").insert(payload);
     setBusy(false);
     if (error) setErr(error.message);
-    else load();
+    else {
+      setDrafts(null);
+      setPasteText("");
+      load();
+    }
   }
 
   async function copyPrevMonth() {
@@ -382,15 +355,8 @@ export default function Enhancers({ session }: { session: Session }) {
             <div className="empty">No rules entered for this month yet.</div>
           </div>
         )}
-        {canEdit && rules.length === 0 && !loading && (
+        {canEdit && rules.length === 0 && !loading && drafts == null && (
           <div className="starter">
-            <button
-              className="btn-primary slim"
-              disabled={busy}
-              onClick={loadTemplate}
-            >
-              Load BH template ({BH_TEMPLATE.length} rules)
-            </button>
             <button
               className="btn-step wide"
               disabled={busy}
@@ -399,10 +365,167 @@ export default function Enhancers({ session }: { session: Session }) {
               Copy last month's rules
             </button>
             <span className="starter-note">
-              then tweak below — and paste this month's magenta stock list
+              or paste this month's sheet text below to draft rules
             </span>
           </div>
         )}
+
+        {canEdit && drafts == null && (
+          <form
+            className="adj-form stock-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const parsed = parseEnhancerText(pasteText);
+              if (parsed.length === 0)
+                setErr(
+                  "Couldn't find any rule lines — paste the brand headings and the % lines from the sheet."
+                );
+              else {
+                setErr(null);
+                setDrafts(parsed);
+              }
+            }}
+          >
+            <div className="field grow">
+              <label htmlFor="paste">
+                Paste enhancer sheet text (brand headings + the % lines)
+              </label>
+              <textarea
+                id="paste"
+                rows={4}
+                value={pasteText}
+                onChange={(e) => setPasteText(e.target.value)}
+                placeholder={
+                  "McLaren Salespeople Enhancers:\n3% - Sell 2 used McLaren including LBO\n3% - 4 trade in, acquisitions or consignments\n..."
+                }
+              />
+            </div>
+            <button className="btn-primary slim" type="submit">
+              Parse into draft rules
+            </button>
+          </form>
+        )}
+
+        {canEdit && drafts != null && (
+          <div className="draft-review">
+            <div className="draft-head">
+              <strong>{drafts.length} draft rule(s)</strong> — review, fix any
+              flagged ⚠ rows, then save. Nothing is saved until you click below.
+            </div>
+            <div className="tablewrap">
+              <table className="deals adj">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Brand</th>
+                    <th>Rule</th>
+                    <th>Counts</th>
+                    <th className="r">Need</th>
+                    <th className="r">%</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {drafts.map((d, i) => {
+                    const upd = (patch: Partial<DraftRule>) =>
+                      setDrafts((prev) =>
+                        prev!.map((x, j) =>
+                          j === i ? { ...x, ...patch, confident: true } : x
+                        )
+                      );
+                    return (
+                      <tr key={i} className={d.confident ? "" : "flagged"}>
+                        <td>{d.confident ? "" : "⚠"}</td>
+                        <td>
+                          <select
+                            value={d.brand}
+                            onChange={(e) => upd({ brand: e.target.value })}
+                          >
+                            {brands.map((b) => (
+                              <option key={b} value={b}>
+                                {b}
+                              </option>
+                            ))}
+                            <option value={ALL_BRANDS}>{ALL_BRANDS}</option>
+                          </select>
+                        </td>
+                        <td className="note-cell">{d.label}</td>
+                        <td>
+                          <select
+                            value={d.metric}
+                            onChange={(e) =>
+                              upd({ metric: e.target.value as EnhancerMetric })
+                            }
+                          >
+                            <option value="new_units">New units</option>
+                            <option value="used_units">Used units</option>
+                            <option value="total_units">Total units</option>
+                            <option value="priority_units">Priority list</option>
+                            <option value="trades">Trade-ins</option>
+                            <option value="acquisitions">Acquisitions</option>
+                            <option value="trades_acquisitions">
+                              Trades + acq
+                            </option>
+                            <option value="manual">Manual review</option>
+                          </select>
+                        </td>
+                        <td className="r">
+                          <input
+                            className="mini"
+                            inputMode="decimal"
+                            value={d.metric === "manual" ? "" : d.threshold}
+                            disabled={d.metric === "manual"}
+                            onChange={(e) =>
+                              upd({ threshold: Number(e.target.value) || 1 })
+                            }
+                          />
+                        </td>
+                        <td className="r">
+                          <input
+                            className="mini"
+                            inputMode="decimal"
+                            value={d.pct ?? ""}
+                            onChange={(e) =>
+                              upd({ pct: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </td>
+                        <td className="r">
+                          <button
+                            className="btn-del"
+                            onClick={() =>
+                              setDrafts((prev) =>
+                                prev!.filter((_, j) => j !== i)
+                              )
+                            }
+                          >
+                            Drop
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="draft-actions">
+              <button
+                className="btn-primary slim"
+                disabled={busy}
+                onClick={() => saveDrafts(drafts)}
+              >
+                {busy ? "Saving…" : `Save ${drafts.length} rule(s)`}
+              </button>
+              <button
+                className="btn-step wide"
+                onClick={() => setDrafts(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {rules.length > 0 && (
           <div className="tablewrap">
             <table className="deals adj">
