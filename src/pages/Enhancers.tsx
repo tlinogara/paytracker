@@ -150,16 +150,6 @@ const load = useCallback(async () => {
     setMtdReps((repRes.data ?? []) as { rep: string; dealer: string | null }[]);
     setLoading(false);
   }, [monthISO]);
-    
-    if (e) setErr(e.message);
-    setRules((rulesRes.data ?? []) as EnhancerRule[]);
-    setStatus((statusRes.data ?? []) as EnhancerStatus[]);
-    setApproved((apprRes.data ?? []) as Adjustment[]);
-    setStocks(
-      ((stockRes.data ?? []) as { stock_no: string }[]).map((s) => s.stock_no)
-    );
-    setLoading(false);
-  }, [monthISO]);
 
   useEffect(() => {
     load();
