@@ -1055,3 +1055,52 @@ table.deals th button.sort.active .arrow {
   font-size: 12.5px;
   color: var(--muted);
 }
+
+/* ---------- Draft review (paste-and-parse) ---------- */
+.draft-review {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.draft-head {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  background: var(--amber-soft);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  border-radius: 0 4px 4px 0;
+  padding: 10px 14px;
+}
+
+table.adj tr.flagged {
+  background: var(--amber-soft);
+}
+
+table.adj select,
+table.adj input.mini {
+  font-family: var(--sans);
+  font-size: 13px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  padding: 5px 6px;
+  color: var(--ink);
+}
+
+table.adj input.mini {
+  width: 56px;
+  text-align: right;
+  font-family: var(--mono);
+}
+
+table.adj input.mini:disabled {
+  background: rgba(23, 25, 30, 0.05);
+  color: var(--muted);
+}
+
+.draft-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
