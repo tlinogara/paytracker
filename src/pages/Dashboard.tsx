@@ -22,7 +22,7 @@ const DEAL_COLUMNS =
 export default function Dashboard({ session }: { session: Session }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileErr, setProfileErr] = useState<string | null>(null);
-  const { month, setMonth, isCurrentMonth } = useMonth();
+  const { month, monthParam, setMonth, isCurrentMonth } = useMonth();
   const [mtd, setMtd] = useState<RepMtd[]>([]);
   const [deals, setDeals] = useState<DealRow[]>([]);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
@@ -156,7 +156,7 @@ export default function Dashboard({ session }: { session: Session }) {
           {isManagerView && (
             <Link
               className="btn-ghost"
-              to={`/enhancers${isCurrentMonth ? "" : `?month=${monthStartISO(month).slice(0, 7)}`}`}
+              to={`/enhancers${isCurrentMonth ? "" : `?month=${monthParam}`}`}
             >
               Enhancers
             </Link>
