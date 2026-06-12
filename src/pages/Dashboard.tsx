@@ -282,6 +282,13 @@ export default function Dashboard({ session }: { session: Session }) {
                 {money(scoped.frontGross)} <small>unit-wtd</small>
               </div>
             </div>
+            <div className="cell">
+              <div className="k">Enh %</div>
+              <div className="v">
+                {overlay.effectivePct > 0 ? `${overlay.effectivePct}%` : "—"}
+                <small>of front gross</small>
+              </div>
+            </div>
           </div>
           {overlay.any && (
             <div className="sticker-breakdown">
