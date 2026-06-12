@@ -50,6 +50,7 @@ export interface Adjustment {
   category: AdjCategory;
   amount: number | null;
   pct: number | null;
+  rate_pct: number | null;
   note: string | null;
   rule_id: string | null;
   created_at: string;

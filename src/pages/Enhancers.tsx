@@ -173,6 +173,7 @@ export default function Enhancers({ session }: { session: Session }) {
       category: "enhancer",
       amount,
       pct: null,
+      rate_pct: s.flat_amount != null ? null : s.pct,
       note,
       rule_id: s.rule_id,
     });

@@ -116,14 +116,16 @@ export default function Dashboard({ session }: { session: Session }) {
   const overlay = useMemo(() => {
     let flat = 0;
     let enhancer = 0;
-    let pctTotal = 0;
+    let ratePct = 0;
     for (const a of adjustments) {
       if (a.pct != null) {
-        // Percentage entries are enhancer-style by definition
-        pctTotal += a.pct;
+        // Percentage-style enhancer entry (manual % spiff)
+        ratePct += a.pct;
         enhancer += (a.pct / 100) * (fgsByRep.get(a.rep) ?? 0);
       } else if (a.category === "enhancer") {
-        // Flat enhancers (incl. one-click approvals) belong here
+        // Flat enhancers (incl. one-click approvals). Their rule rate, if
+        // any, is recorded on rate_pct; flat-cash rules leave it null.
+        ratePct += a.rate_pct ?? 0;
         enhancer += a.amount ?? 0;
       } else {
         flat += a.amount ?? 0;
@@ -131,15 +133,11 @@ export default function Dashboard({ session }: { session: Session }) {
     }
     enhancer = Math.round(enhancer * 100) / 100;
     flat = Math.round(flat * 100) / 100;
-    // Effective enhancer rate = total enhancer $ / front gross, like
-    // CompTrackr's "Enhancers %". Works regardless of how each enhancer
-    // was entered (%, flat approval, or flat-cash rule).
-    const effectivePct =
-      scoped.frontGross > 0
-        ? Math.round((enhancer / scoped.frontGross) * 1000) / 10
-        : 0;
-    return { flat, enhancer, pctTotal, effectivePct, any: adjustments.length > 0 };
-  }, [adjustments, fgsByRep, scoped.frontGross]);
+    // "Enh %" = sum of the rule rates the rep qualified for (e.g. 3% + 2%).
+    // 2-decimal precision so 5.2% / 5.25% display correctly.
+    const totalPct = Math.round(ratePct * 100) / 100;
+    return { flat, enhancer, totalPct, any: adjustments.length > 0 };
+  }, [adjustments, fgsByRep]);
 
   const acqUnits = useMemo(
     () =>
@@ -285,8 +283,8 @@ export default function Dashboard({ session }: { session: Session }) {
             <div className="cell">
               <div className="k">Enh %</div>
               <div className="v">
-                {overlay.effectivePct > 0 ? `${overlay.effectivePct}%` : "—"}
-                <small>of front gross</small>
+                {overlay.totalPct > 0 ? `${overlay.totalPct.toFixed(2)}%` : "—"}
+                <small>qualified rules</small>
               </div>
             </div>
           </div>
@@ -303,7 +301,7 @@ export default function Dashboard({ session }: { session: Session }) {
               <div className="bcell">
                 <span className="k">
                   Enhancers
-                  {overlay.effectivePct > 0 ? ` (${overlay.effectivePct}%)` : ""}
+                  {overlay.totalPct > 0 ? ` (${overlay.totalPct.toFixed(2)}%)` : ""}
                 </span>
                 <span className="v">{moneyExact(overlay.enhancer)}</span>
               </div>
