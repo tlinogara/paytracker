@@ -13,6 +13,30 @@ import type {
   EnhancerStatus,
   Profile,
 } from "../lib/types";
+
+// While editing, numeric fields are raw strings so the user can type "1."
+// mid-entry. Coerced to numbers only on save.
+type EditDraft = {
+  brand: string;
+  label: string;
+  metric: EnhancerMetric;
+  threshold: string;
+  pct: string;
+  flat_amount: string;
+  confident: boolean;
+};
+
+function toEditDraft(d: DraftRule): EditDraft {
+  return {
+    brand: d.brand,
+    label: d.label,
+    metric: d.metric,
+    threshold: String(d.threshold ?? ""),
+    pct: d.pct == null || d.pct === 0 ? "" : String(d.pct),
+    flat_amount: d.flat_amount == null ? "" : String(d.flat_amount),
+    confident: d.confident,
+  };
+}
 import {
   moneyExact,
   money,
@@ -59,7 +83,7 @@ export default function Enhancers({ session }: { session: Session }) {
 
   // Paste-and-parse assist
   const [pasteText, setPasteText] = useState("");
-  const [drafts, setDrafts] = useState<DraftRule[] | null>(null);
+  const [drafts, setDrafts] = useState<EditDraft[] | null>(null);
 
   useEffect(() => {
     supabase
@@ -137,8 +161,11 @@ export default function Enhancers({ session }: { session: Session }) {
     setErr(null);
     const amount = s.proposed_amount ?? 0;
     const note =
-      `${s.brand}: ${s.label} — ${units(s.metric_value)}/${units(s.threshold)} ` +
-      `qualified; +${s.pct}% × ${money(s.brand_front_gross)} ${s.brand} front gross`;
+      s.flat_amount != null
+        ? `${s.brand}: ${s.label} — ${units(s.metric_value)}/${units(s.threshold)} qualified; ` +
+          `${moneyExact(s.flat_amount)} × ${units(s.metric_value)} units`
+        : `${s.brand}: ${s.label} — ${units(s.metric_value)}/${units(s.threshold)} qualified; ` +
+          `+${s.pct}% × ${money(s.brand_front_gross)} ${s.brand} front gross`;
     const { error } = await supabase.from("adjustments").insert({
       rep: s.rep,
       store: s.dealer ?? profile?.store_name ?? "unknown",
@@ -197,18 +224,49 @@ export default function Enhancers({ session }: { session: Session }) {
     else load();
   }
 
-  async function saveDrafts(rows: DraftRule[]) {
+  async function saveDrafts(rows: EditDraft[]) {
     setErr(null);
+    // Validate: each rule needs a payout (pct or flat), a label, and a
+    // threshold unless it's manual.
+    for (const d of rows) {
+      const pct = Number(d.pct);
+      const flat = Number(d.flat_amount);
+      const hasPct = d.pct.trim() !== "" && pct > 0;
+      const hasFlat = d.flat_amount.trim() !== "" && flat > 0;
+      if (!d.label.trim()) {
+        setErr("Every rule needs a description.");
+        return;
+      }
+      if (!hasPct && !hasFlat && d.metric !== "manual") {
+        setErr(`"${d.label.slice(0, 40)}" needs a % or a $/unit amount.`);
+        return;
+      }
+      if (hasPct && hasFlat) {
+        setErr(
+          `"${d.label.slice(0, 40)}" has both % and $/unit — clear one.`
+        );
+        return;
+      }
+    }
     setBusy(true);
-    const payload = rows.map((d) => ({
-      month: monthISO,
-      brand: d.brand,
-      make_pattern: d.brand === ALL_BRANDS ? "%" : `%${d.brand}%`,
-      label: d.label,
-      pct: d.pct ?? 0,
-      metric: d.metric,
-      threshold: d.threshold,
-    }));
+    const payload = rows.map((d) => {
+      const flat =
+        d.flat_amount.trim() !== "" && Number(d.flat_amount) > 0
+          ? Number(d.flat_amount)
+          : null;
+      return {
+        month: monthISO,
+        brand: d.brand,
+        make_pattern: d.brand === ALL_BRANDS ? "%" : `%${d.brand}%`,
+        label: d.label.trim(),
+        // Exactly one of pct / flat_per_unit is set (DB constraint).
+        pct: flat != null ? null : Number(d.pct) || 0,
+        flat_amount: flat,
+        metric: d.metric,
+        threshold:
+          d.metric === "manual" ? 1 : Math.max(1, Number(d.threshold) || 1),
+      };
+    });
     const { error } = await supabase.from("enhancer_rules").insert(payload);
     setBusy(false);
     if (error) setErr(error.message);
@@ -382,7 +440,7 @@ export default function Enhancers({ session }: { session: Session }) {
                 );
               else {
                 setErr(null);
-                setDrafts(parsed);
+                setDrafts(parsed.map(toEditDraft));
               }
             }}
           >
@@ -422,12 +480,13 @@ export default function Enhancers({ session }: { session: Session }) {
                     <th>Counts</th>
                     <th className="r">Need</th>
                     <th className="r">%</th>
+                    <th className="r">$/unit</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {drafts.map((d, i) => {
-                    const upd = (patch: Partial<DraftRule>) =>
+                    const upd = (patch: Partial<EditDraft>) =>
                       setDrafts((prev) =>
                         prev!.map((x, j) =>
                           j === i ? { ...x, ...patch, confident: true } : x
@@ -449,7 +508,13 @@ export default function Enhancers({ session }: { session: Session }) {
                             <option value={ALL_BRANDS}>{ALL_BRANDS}</option>
                           </select>
                         </td>
-                        <td className="note-cell">{d.label}</td>
+                        <td>
+                          <input
+                            className="desc"
+                            value={d.label}
+                            onChange={(e) => upd({ label: e.target.value })}
+                          />
+                        </td>
                         <td>
                           <select
                             value={d.metric}
@@ -475,19 +540,25 @@ export default function Enhancers({ session }: { session: Session }) {
                             inputMode="decimal"
                             value={d.metric === "manual" ? "" : d.threshold}
                             disabled={d.metric === "manual"}
-                            onChange={(e) =>
-                              upd({ threshold: Number(e.target.value) || 1 })
-                            }
+                            onChange={(e) => upd({ threshold: e.target.value })}
                           />
                         </td>
                         <td className="r">
                           <input
                             className="mini"
                             inputMode="decimal"
-                            value={d.pct ?? ""}
-                            onChange={(e) =>
-                              upd({ pct: Number(e.target.value) || 0 })
-                            }
+                            placeholder="%"
+                            value={d.pct}
+                            onChange={(e) => upd({ pct: e.target.value })}
+                          />
+                        </td>
+                        <td className="r">
+                          <input
+                            className="mini"
+                            inputMode="decimal"
+                            placeholder="$/unit"
+                            value={d.flat_amount}
+                            onChange={(e) => upd({ flat_amount: e.target.value })}
                           />
                         </td>
                         <td className="r">
@@ -548,7 +619,11 @@ export default function Enhancers({ session }: { session: Session }) {
                     <td className="r num">
                       {r.metric === "manual" ? "—" : units(r.threshold)}
                     </td>
-                    <td className="r money pos">+{r.pct}%</td>
+                    <td className="r money pos">
+                      {r.flat_amount != null
+                        ? `${moneyExact(r.flat_amount)}/unit`
+                        : `+${r.pct}%`}
+                    </td>
                     {canEdit && (
                       <td className="r">
                         <button
@@ -753,8 +828,10 @@ export default function Enhancers({ session }: { session: Session }) {
                   </span>
                   <span className="why num">
                     {units(s.metric_value)}/{units(s.threshold)}{" "}
-                    {METRIC_LABEL[s.metric].toLowerCase()} ✓ · +{s.pct}% ×{" "}
-                    {money(s.brand_front_gross)} {s.brand} gross
+                    {METRIC_LABEL[s.metric].toLowerCase()} ✓ ·{" "}
+                    {s.flat_amount != null
+                      ? `${moneyExact(s.flat_amount)} × ${units(s.metric_value)} = ${moneyExact(s.proposed_amount)}`
+                      : `+${s.pct}% × ${money(s.brand_front_gross)} ${s.brand} gross`}
                   </span>
                 </div>
                 {canEdit && (

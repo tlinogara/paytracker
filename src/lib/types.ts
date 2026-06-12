@@ -72,6 +72,7 @@ export interface EnhancerRule {
   make_pattern: string;
   label: string;
   pct: number;
+  flat_amount: number | null;
   metric: EnhancerMetric;
   threshold: number;
 }
@@ -82,6 +83,7 @@ export interface EnhancerStatus {
   brand: string;
   label: string;
   pct: number;
+  flat_amount: number | null;
   metric: Exclude<EnhancerMetric, "manual">;
   threshold: number;
   rep: string;

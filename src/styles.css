@@ -1104,3 +1104,22 @@ table.adj input.mini:disabled {
   gap: 10px;
   align-items: center;
 }
+
+/* Editable draft description + flat-amount input */
+table.adj input.desc {
+  width: 100%;
+  min-width: 180px;
+  font-family: var(--sans);
+  font-size: 13px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  padding: 6px 8px;
+  color: var(--ink);
+}
+
+table.adj input.desc:focus,
+table.adj input.mini:focus {
+  outline: 2px solid var(--green);
+  border-color: transparent;
+}
