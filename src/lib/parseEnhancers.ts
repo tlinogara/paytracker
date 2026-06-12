@@ -4,6 +4,7 @@ export interface DraftRule {
   brand: string;
   label: string;
   pct: number | null;
+  flat_amount: number | null;
   metric: EnhancerMetric;
   threshold: number;
   confident: boolean; // false = the parser is guessing; check before saving
@@ -27,6 +28,12 @@ function detectBrandHeading(line: string): string | null {
 function extractPct(line: string): number | null {
   const m = /(\d+(?:\.\d+)?)\s*%/.exec(line);
   return m ? Number(m[1]) : null;
+}
+
+// "$2,000" / "$2000 per acquisition" -> 2000
+function extractFlat(line: string): number | null {
+  const m = /\$\s*([\d,]+(?:\.\d+)?)/.exec(line);
+  return m ? Number(m[1].replace(/,/g, "")) : null;
 }
 
 /**
@@ -126,12 +133,14 @@ export function parseEnhancerText(text: string): DraftRule[] {
       currentBrand = heading;
       continue;
     }
-    if (extractPct(rawLine) == null) continue; // not a payout line
+    const lineHasFlat = extractFlat(rawLine) != null;
+    if (extractPct(rawLine) == null && !lineHasFlat) continue; // not a payout
     if (/^[0-9A-Z]{5,8}$/.test(rawLine)) continue; // stock number
 
     for (const line of splitOrClauses(rawLine)) {
       const pct = extractPct(line);
-      if (pct == null) continue;
+      const flat = extractFlat(line);
+      if (pct == null && flat == null) continue;
       const { metric, confident: metricOK } = guessMetric(line);
       const th =
         metric === "manual"
@@ -141,10 +150,13 @@ export function parseEnhancerText(text: string): DraftRule[] {
       drafts.push({
         brand: currentBrand || "All brands",
         label,
-        pct,
+        pct: flat != null ? 0 : pct,
+        flat_amount: flat,
         metric,
         threshold: th.value,
-        confident: metricOK && th.confident && Boolean(currentBrand),
+        // Flat per-unit rules always get a look (need to confirm the metric).
+        confident:
+          flat == null && metricOK && th.confident && Boolean(currentBrand),
       });
     }
   }
