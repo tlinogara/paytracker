@@ -114,9 +114,9 @@ button {
 }
 
 .page {
-  max-width: 1060px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 28px 20px 80px;
+  padding: 28px 24px 80px;
 }
 
 /* ---------- Month switcher ---------- */
@@ -1122,4 +1122,70 @@ table.adj input.desc:focus,
 table.adj input.mini:focus {
   outline: 2px solid var(--green);
   border-color: transparent;
+}
+/* =====================================================================
+   UI update additions — append these to the END of src/styles.css.
+   You also need a one-line change to the existing `.page` rule
+   (see README_FIRST.md, step 2).
+   ===================================================================== */
+
+/* ---------- Collapsible sections ---------- */
+.section-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+}
+.section-toggle h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-toggle:hover h2 {
+  color: var(--green);
+}
+.section-toggle .chev {
+  display: inline-block;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+.section-toggle .chev.open {
+  transform: rotate(90deg);
+}
+.collapsible-body {
+  margin-top: 10px;
+}
+
+/* ---------- Brand filter chips (Enhancers rules) ---------- */
+.brand-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.fchip {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+.fchip:hover {
+  border-color: var(--ink);
+}
+.fchip.active {
+  background: var(--green-soft);
+  border-color: var(--green);
+  color: var(--green);
 }
