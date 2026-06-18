@@ -13,6 +13,7 @@ import type {
   EnhancerStatus,
   Profile,
 } from "../lib/types";
+import Collapsible from "../components/Collapsible"
 
 // While editing, numeric fields are raw strings so the user can type "1."
 // mid-entry. Coerced to numbers only on save.
@@ -79,6 +80,8 @@ export default function Enhancers({ session }: { session: Session }) {
   const [metric, setMetric] = useState<EnhancerMetric>("used_units");
   const [threshold, setThreshold] = useState("");
   const [busy, setBusy] = useState(false);
+  const [ruleBrand, setRuleBrand] = useState<string>(""); // "" = all
+
 
   // Priority stock form
   const [stockPaste, setStockPaste] = useState("");
@@ -160,6 +163,16 @@ const load = useCallback(async () => {
     [approved]
   );
 
+  const ruleBrands = useMemo(
+    () => Array.from(new Set(rules.map((r) => r.brand))).sort(),
+    [rules]
+  );
+
+const visibleRules = useMemo(
+  () => (ruleBrand ? rules.filter((r) => r.brand === ruleBrand) : rules),
+  [rules, ruleBrand]
+);
+  
   const pending = status.filter(
     (s) => !approvedKeys.has(`${s.rule_id}|${s.rep}`)
   );
@@ -500,6 +513,84 @@ async function approve(s: EnhancerStatus) {
             </button>
           </form>
         )}
+        
+        {canEdit && drafts == null && (
+          <form className="adj-form" onSubmit={addRule}>
+            <div className="field">
+              <label htmlFor="er-brand">Brand</label>
+              <select
+                id="er-brand"
+                required
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+              >
+                <option value="" disabled>
+                  Choose…
+                </option>
+                {brands.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+                <option value={ALL_BRANDS}>{ALL_BRANDS}</option>
+              </select>
+            </div>
+            <div className="field grow">
+              <label htmlFor="er-label">Rule (from the monthly sheet)</label>
+              <input
+                id="er-label"
+                required
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="Sell 2 used McLaren including LBO"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="er-metric">Counts</label>
+              <select
+                id="er-metric"
+                value={metric}
+                onChange={(e) => setMetric(e.target.value as EnhancerMetric)}
+              >
+                <option value="new_units">New units</option>
+                <option value="used_units">Used units</option>
+                <option value="total_units">Total units</option>
+                <option value="priority_units">Priority-list units</option>
+                <option value="trades">Trade-ins</option>
+                <option value="acquisitions">Acquisitions</option>
+                <option value="trades_acquisitions">
+                  Trades + acquisitions
+                </option>
+                <option value="manual">Manual review</option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="er-th">Need</label>
+              <input
+                id="er-th"
+                inputMode="decimal"
+                value={threshold}
+                onChange={(e) => setThreshold(e.target.value)}
+                placeholder="2"
+                disabled={metric === "manual"}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="er-pct">Rate %</label>
+              <input
+                id="er-pct"
+                inputMode="decimal"
+                required
+                value={pct}
+                onChange={(e) => setPct(e.target.value)}
+                placeholder="3"
+              />
+            </div>
+            <button className="btn-primary slim" disabled={busy} type="submit">
+              {busy ? "Saving…" : "Add rule"}
+            </button>
+          </form>
+        )}
 
         {canEdit && drafts != null && (
           <div className="draft-review">
@@ -635,125 +726,69 @@ async function approve(s: EnhancerStatus) {
         )}
 
         {rules.length > 0 && (
-          <div className="tablewrap">
-            <table className="deals adj">
-              <thead>
-                <tr>
-                  <th>Brand</th>
-                  <th>Rule</th>
-                  <th>Counts</th>
-                  <th className="r">Need</th>
-                  <th className="r">Rate</th>
-                  {canEdit && <th></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {rules.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.brand}</td>
-                    <td className="note-cell">{r.label}</td>
-                    <td>{METRIC_LABEL[r.metric]}</td>
-                    <td className="r num">
-                      {r.metric === "manual" ? "—" : units(r.threshold)}
-                    </td>
-                    <td className="r money pos">
-                      {r.flat_amount != null
-                        ? `${moneyExact(r.flat_amount)}/unit`
-                        : `+${r.pct}%`}
-                    </td>
-                    {canEdit && (
-                      <td className="r">
-                        <button
-                          className="btn-del"
-                          onClick={() => removeRule(r.id)}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {canEdit && (
-          <form className="adj-form" onSubmit={addRule}>
-            <div className="field">
-              <label htmlFor="er-brand">Brand</label>
-              <select
-                id="er-brand"
-                required
-                value={brand}
-                onChange={(e) => setBrand(e.target.value)}
-              >
-                <option value="" disabled>
-                  Choose…
-                </option>
-                {brands.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-                <option value={ALL_BRANDS}>{ALL_BRANDS}</option>
-              </select>
-            </div>
-            <div className="field grow">
-              <label htmlFor="er-label">Rule (from the monthly sheet)</label>
-              <input
-                id="er-label"
-                required
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="Sell 2 used McLaren including LBO"
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="er-metric">Counts</label>
-              <select
-                id="er-metric"
-                value={metric}
-                onChange={(e) => setMetric(e.target.value as EnhancerMetric)}
-              >
-                <option value="new_units">New units</option>
-                <option value="used_units">Used units</option>
-                <option value="total_units">Total units</option>
-                <option value="priority_units">Priority-list units</option>
-                <option value="trades">Trade-ins</option>
-                <option value="acquisitions">Acquisitions</option>
-                <option value="trades_acquisitions">
-                  Trades + acquisitions
-                </option>
-                <option value="manual">Manual review</option>
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="er-th">Need</label>
-              <input
-                id="er-th"
-                inputMode="decimal"
-                value={threshold}
-                onChange={(e) => setThreshold(e.target.value)}
-                placeholder="2"
-                disabled={metric === "manual"}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="er-pct">Rate %</label>
-              <input
-                id="er-pct"
-                inputMode="decimal"
-                required
-                value={pct}
-                onChange={(e) => setPct(e.target.value)}
-                placeholder="3"
-              />
-            </div>
-            <button className="btn-primary slim" disabled={busy} type="submit">
-              {busy ? "Saving…" : "Add rule"}
-            </button>
-          </form>
-        )}
+  <Collapsible
+    title="Saved rules"
+    count={`${visibleRules.length} of ${rules.length}`}
+  >
+    {ruleBrands.length > 1 && (
+      <div className="brand-filter">
+        <button
+          className={`fchip ${ruleBrand === "" ? "active" : ""}`}
+          onClick={() => setRuleBrand("")}
+        >
+          All
+        </button>
+        {ruleBrands.map((b) => (
+          <button
+            key={b}
+            className={`fchip ${ruleBrand === b ? "active" : ""}`}
+            onClick={() => setRuleBrand(b)}
+          >
+            {b}
+          </button>
+        ))}
+      </div>
+    )}
+    <div className="tablewrap">
+      <table className="deals adj">
+        <thead>
+          <tr>
+            <th>Brand</th>
+            <th>Rule</th>
+            <th>Counts</th>
+            <th className="r">Need</th>
+            <th className="r">Rate</th>
+            {canEdit && <th></th>}
+          </tr>
+        </thead>
+        <tbody>
+          {visibleRules.map((r) => (
+            <tr key={r.id}>
+              <td>{r.brand}</td>
+              <td className="note-cell">{r.label}</td>
+              <td>{METRIC_LABEL[r.metric]}</td>
+              <td className="r num">
+                {r.metric === "manual" ? "—" : units(r.threshold)}
+              </td>
+              <td className="r money pos">
+                {r.flat_amount != null
+                  ? `${moneyExact(r.flat_amount)}/unit`
+                  : `+${r.pct}%`}
+              </td>
+              {canEdit && (
+                <td className="r">
+                  <button className="btn-del" onClick={() => removeRule(r.id)}>
+                    Remove
+                  </button>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </Collapsible>
+)}        
 
         {/* ----- 2. Priority / magenta list ----- */}
         <div className="section-head">

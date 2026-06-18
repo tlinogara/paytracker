@@ -14,6 +14,7 @@ import {
 } from "../lib/format";
 import DealsTable from "../components/DealsTable";
 import Adjustments from "../components/Adjustments";
+import Collapsible from "../components/Collapsible";
 
 const DEAL_COLUMNS =
   "deal_number, rep, contract_date, status, stock_type, customer, vehicle, " +
@@ -152,7 +153,6 @@ export default function Dashboard({ session }: { session: Session }) {
   const projected =
     Math.round((scoped.commission + overlay.flat + overlay.enhancer) * 100) /
     100;
-
 
   const formStore =
     profile?.store_name ||
@@ -344,30 +344,6 @@ export default function Dashboard({ session }: { session: Session }) {
           </>
         )}
 
-        {(isManagerView || adjustments.length > 0) && (
-          <>
-            <div className="section-head">
-              <h2>Spiffs &amp; enhancers</h2>
-              <span className="count">
-                {isManagerView
-                  ? "manual entries on top of the deal log"
-                  : "entered by your manager or payroll"}
-              </span>
-            </div>
-            <Adjustments
-              key={`${monthStartISO(month)}-${selectedRep ?? "all"}`}
-              entries={adjustments}
-              canEdit={isManagerView}
-              monthISO={monthStartISO(month)}
-              reps={mtd.map((r) => r.rep)}
-              fgsByRep={fgsByRep}
-              defaultStore={formStore}
-              selectedRep={selectedRep}
-              onChanged={loadData}
-            />
-          </>
-        )}
-
         <div className="section-head">
           <h2>Deals</h2>
           <span className="count">
@@ -380,6 +356,30 @@ export default function Dashboard({ session }: { session: Session }) {
           </div>
         ) : (
           <DealsTable deals={deals} showRep={isManagerView && !selectedRep} />
+        )}
+
+        {(isManagerView || adjustments.length > 0) && (
+          <Collapsible
+            title="Spiffs & enhancers"
+            count={
+              isManagerView
+                ? "manual entries on top of the deal log"
+                : "entered by your manager or payroll"
+            }
+            defaultOpen={false}
+          >
+            <Adjustments
+              key={`${monthStartISO(month)}-${selectedRep ?? "all"}`}
+              entries={adjustments}
+              canEdit={isManagerView}
+              monthISO={monthStartISO(month)}
+              reps={mtd.map((r) => r.rep)}
+              fgsByRep={fgsByRep}
+              defaultStore={formStore}
+              selectedRep={selectedRep}
+              onChanged={loadData}
+            />
+          </Collapsible>
         )}
       </main>
     </>

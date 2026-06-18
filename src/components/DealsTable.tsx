@@ -7,6 +7,7 @@ type SortKey =
   | "deal"
   | "rep"
   | "customer"
+  | "make"
   | "nu"
   | "unit"
   | "front"
@@ -22,6 +23,7 @@ const ACCESSORS: Record<SortKey, (d: DealRow) => string | number | null> = {
   },
   rep: (d) => d.rep?.toLowerCase() ?? null,
   customer: (d) => d.customer?.toLowerCase() ?? null,
+  make: (d) => d.make?.toLowerCase() ?? null,
   nu: (d) => d.stock_type?.toLowerCase() ?? null,
   unit: (d) => d.rep_unit_count,
   front: (d) => d.front_gross,
@@ -110,7 +112,8 @@ export default function DealsTable({
             <Th label="Deal" k="deal" sort={sort} onSort={onSort} />
             {showRep && <Th label="Rep" k="rep" sort={sort} onSort={onSort} />}
             <Th label="Customer / vehicle" k="customer" sort={sort} onSort={onSort} />
-            <Th label="N/U" k="nu" sort={sort} onSort={onSort} />
+            <Th label="Brand" k="make" sort={sort} onSort={onSort} />
+            <Th label="N/U/A" k="nu" sort={sort} onSort={onSort} />
             <Th label="Unit" k="unit" sort={sort} onSort={onSort} right />
             <Th label="Front gross" k="front" sort={sort} onSort={onSort} right />
             <Th label="My commission" k="comm" sort={sort} onSort={onSort} right />
@@ -134,6 +137,7 @@ export default function DealsTable({
                   <br />
                   <span className="veh">{d.vehicle || ""}</span>
                 </td>
+                <td>{d.make?.trim() || "—"}</td>
                 <td>
                   {!d.make || !d.make.trim() ? (
                     <span className="badge acq">Acq</span>
