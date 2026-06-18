@@ -13,6 +13,7 @@ import type {
   EnhancerStatus,
   Profile,
 } from "../lib/types";
+import Collapsible from "../components/Collapsible"
 
 // While editing, numeric fields are raw strings so the user can type "1."
 // mid-entry. Coerced to numbers only on save.
@@ -79,6 +80,8 @@ export default function Enhancers({ session }: { session: Session }) {
   const [metric, setMetric] = useState<EnhancerMetric>("used_units");
   const [threshold, setThreshold] = useState("");
   const [busy, setBusy] = useState(false);
+  const [ruleBrand, setRuleBrand] = useState<string>(""); // "" = all
+
 
   // Priority stock form
   const [stockPaste, setStockPaste] = useState("");
@@ -159,7 +162,7 @@ const load = useCallback(async () => {
     () => new Set(approved.map((a) => `${a.rule_id}|${a.rep}`)),
     [approved]
   );
-
+  
   const pending = status.filter(
     (s) => !approvedKeys.has(`${s.rule_id}|${s.rep}`)
   );
