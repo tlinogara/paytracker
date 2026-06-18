@@ -6,6 +6,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { parseEnhancerText } from "../lib/parseEnhancers";
 import type { DraftRule } from "../lib/parseEnhancers";
+import PayPlans from "../components/PayPlans";
 import type {
   Adjustment,
   EnhancerMetric,
@@ -165,23 +166,26 @@ const load = useCallback(async () => {
   );
   const manualRules = rules.filter((r) => r.metric === "manual");
 
-async function approve(s: EnhancerStatus) {
+  async function approve(s: EnhancerStatus) {
     setErr(null);
-    const amount = s.proposed_amount ?? 0;
-    const note =
-      s.flat_amount != null
-        ? `${s.brand}: ${s.label} — ${units(s.metric_value)}/${units(s.threshold)} qualified; ` +
-          `${moneyExact(s.flat_amount)} × ${units(s.metric_value)} units`
-        : `${s.brand}: ${s.label} — ${units(s.metric_value)}/${units(s.threshold)} qualified; ` +
-          `+${s.pct}% × ${money(s.brand_front_gross)} ${s.brand} front gross`;
+    const isFlat = s.flat_amount != null;
+    // %-enhancers fold into the rep's per-deal rate (stored as rate_pct, with
+    // no dollar amount) so the engine pays them mini-aware across every deal.
+    // Flat-$ enhancers are additive dollars (stored as amount, no rate).
+    // Storing both a dollar AND a rate would double-pay the enhancer.
+    const note = isFlat
+      ? `${s.brand}: ${s.label} — ${units(s.metric_value)}/${units(s.threshold)} qualified; ` +
+        `${moneyExact(s.flat_amount)} × ${units(s.metric_value)} units`
+      : `${s.brand}: ${s.label} — ${units(s.metric_value)}/${units(s.threshold)} qualified; ` +
+        `+${s.pct}% folded into deal rate (est. ${money(s.proposed_amount)})`;
     const { error } = await supabase.from("adjustments").insert({
       rep: s.rep,
       store: s.dealer ?? profile?.store_name ?? "unknown",
       month: monthISO,
       category: "enhancer",
-      amount,
+      amount: isFlat ? (s.proposed_amount ?? 0) : null,
       pct: null,
-      rate_pct: s.flat_amount != null ? null : s.pct,
+      rate_pct: isFlat ? null : s.pct,
       note,
       rule_id: s.rule_id,
     });
@@ -438,6 +442,23 @@ async function approve(s: EnhancerStatus) {
             You can view enhancer rules here; approvals and edits are for
             managers and payroll.
           </div>
+        )}
+
+        {canEdit && (
+          <PayPlans
+            monthISO={monthISO}
+            monthName={monthLabel(month)}
+            stores={[
+              ...new Set(
+                mtdReps
+                  .map((m) => m.dealer)
+                  .filter((d): d is string => !!d)
+              ),
+            ]}
+            reps={mtdReps.map((m) => m.rep)}
+            defaultStore={profile?.store_name ?? null}
+            isAdmin={profile?.role === "admin"}
+          />
         )}
 
         {/* ----- 1. Rules ----- */}
@@ -920,7 +941,9 @@ async function approve(s: EnhancerStatus) {
                 </div>
                 {canEdit && (
                   <button className="btn-approve" onClick={() => approve(s)}>
-                    Approve {moneyExact(s.proposed_amount)}
+                    {s.flat_amount != null
+                      ? `Approve ${moneyExact(s.proposed_amount)}`
+                      : `Approve +${s.pct}%`}
                   </button>
                 )}
               </div>

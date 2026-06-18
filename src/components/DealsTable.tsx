@@ -76,8 +76,7 @@ export default function DealsTable({
     setSort((s) =>
       s.key === k
         ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" }
-        : // money/units feel best starting big-first; text starts A→Z
-          { key: k, dir: k === "unit" || k === "front" || k === "comm" || k === "date" ? "desc" : "asc" }
+        : { key: k, dir: k === "unit" || k === "front" || k === "comm" || k === "date" ? "desc" : "asc" }
     );
   }
 
@@ -151,6 +150,9 @@ export default function DealsTable({
                 </td>
                 <td className={`r money ${comm < 0 ? "neg" : "pos"}`}>
                   {moneyExact(comm)}
+                  {d.enhancer_dollars != null && d.enhancer_dollars > 0 && (
+                    <span className="deal-no"> incl. {moneyExact(d.enhancer_dollars)} enh</span>
+                  )}
                 </td>
                 <td>
                   {d.is_split_deal && (

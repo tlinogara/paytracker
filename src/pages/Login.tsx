@@ -24,7 +24,6 @@ export default function Login() {
           password,
         });
         if (error) setErr(error.message);
-        // success: App's onAuthStateChange redirects automatically
       } else {
         const { error } = await supabase.auth.signInWithOtp({
           email: email.trim(),
