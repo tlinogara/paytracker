@@ -16,7 +16,6 @@ export default function Adjustments({
   canEdit,
   monthISO,
   reps,
-  fgsByRep,
   defaultStore,
   selectedRep,
   onChanged,
@@ -25,7 +24,6 @@ export default function Adjustments({
   canEdit: boolean;
   monthISO: string;
   reps: string[];
-  fgsByRep: Map<string, number>;
   defaultStore: string | null;
   selectedRep: string | null;
   onChanged: () => void;
@@ -41,11 +39,6 @@ export default function Adjustments({
 
   // Keep the form's rep in sync when a manager taps a different rep.
   const repValue = selectedRep ?? rep;
-
-  function enhancerDollars(a: Adjustment): number {
-    if (a.pct == null) return a.amount ?? 0;
-    return Math.round(((a.pct / 100) * (fgsByRep.get(a.rep) ?? 0)) * 100) / 100;
-  }
 
   async function add(e: FormEvent) {
     e.preventDefault();
@@ -127,48 +120,53 @@ export default function Adjustments({
               </tr>
             </thead>
             <tbody>
-              {entries.map((a) => (
-                <tr key={a.id}>
-                  <td>{a.rep}</td>
-                  <td>
-                    <span className={`badge cat-${a.category}`}>
-                      {CATEGORY_LABEL[a.category]}
-                    </span>
-                  </td>
-                  <td className="r money pos">
-                    {a.pct != null ? (
-                      <>
-                        +{a.pct}%{" "}
-                        <span className="deal-no">
-                          ≈ {moneyExact(enhancerDollars(a))}
-                        </span>
-                      </>
-                    ) : (
-                      moneyExact(a.amount)
-                    )}
-                  </td>
-                  <td>
-                    {a.deal_number ? (
-                      <span className="deal-no">#{a.deal_number}</span>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="note-cell">{a.note || "—"}</td>
-                  <td className="num">{shortDate(a.created_at.slice(0, 10))}</td>
-                  {canEdit && (
-                    <td className="r">
-                      <button
-                        className="btn-del"
-                        aria-label="Delete entry"
-                        onClick={() => remove(a.id)}
-                      >
-                        Remove
-                      </button>
+              {entries.map((a) => {
+                // A rate (rate_pct from an approved rule, or a manual pct) folds
+                // into the rep's per-deal commission rate and is paid by the
+                // engine — mini-aware. Flat dollars are added on top as-is.
+                const rate = a.rate_pct ?? a.pct;
+                const isRate = rate != null;
+                return (
+                  <tr key={a.id}>
+                    <td>{a.rep}</td>
+                    <td>
+                      <span className={`badge cat-${a.category}`}>
+                        {CATEGORY_LABEL[a.category]}
+                      </span>
                     </td>
-                  )}
-                </tr>
-              ))}
+                    <td className="r money pos">
+                      {isRate ? (
+                        <>
+                          +{rate}%{" "}
+                          <span className="deal-no">in rate</span>
+                        </>
+                      ) : (
+                        moneyExact(a.amount)
+                      )}
+                    </td>
+                    <td>
+                      {a.deal_number ? (
+                        <span className="deal-no">#{a.deal_number}</span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="note-cell">{a.note || "—"}</td>
+                    <td className="num">{shortDate(a.created_at.slice(0, 10))}</td>
+                    {canEdit && (
+                      <td className="r">
+                        <button
+                          className="btn-del"
+                          aria-label="Delete entry"
+                          onClick={() => remove(a.id)}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -216,7 +214,7 @@ export default function Adjustments({
             />
           </div>
           <div className="field">
-            <label htmlFor="adj-pct">or %</label>
+            <label htmlFor="adj-pct">or % (folds into rate)</label>
             <input
               id="adj-pct"
               inputMode="decimal"

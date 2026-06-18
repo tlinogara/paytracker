@@ -15,9 +15,12 @@ import {
 import DealsTable from "../components/DealsTable";
 import Adjustments from "../components/Adjustments";
 
+// Now read from the deal_pay view (engine-computed per-deal commission),
+// not the raw deals table. rep_commission here = base + folded enhancer.
 const DEAL_COLUMNS =
   "deal_number, rep, contract_date, status, stock_type, customer, vehicle, " +
-  "front_gross, rep_unit_count, rep_commission, is_split_deal, salesperson, dealer, make";
+  "front_gross, rep_unit_count, rep_commission, base_commission, enhancer_dollars, " +
+  "is_split_deal, salesperson, dealer, make";
 
 export default function Dashboard({ session }: { session: Session }) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -56,7 +59,7 @@ export default function Dashboard({ session }: { session: Session }) {
       .order("total_commission", { ascending: false });
 
     let dealsQuery = supabase
-      .from("deals")
+      .from("deal_pay")
       .select(DEAL_COLUMNS)
       .gte("contract_date", start)
       .lt("contract_date", end)
@@ -93,51 +96,39 @@ export default function Dashboard({ session }: { session: Session }) {
   const isManagerView = profile?.role === "manager" || profile?.role === "admin";
 
   // Sticker scope: a single rep's row when scoped, otherwise team totals.
+  // base_commission / enhancer_dollars / total_commission all come from the
+  // engine (rep_mtd), so the mini and split logic is already baked in.
   const scoped = useMemo(() => {
     const rows = selectedRep ? mtd.filter((r) => r.rep === selectedRep) : mtd;
     const sum = (f: (r: RepMtd) => number | null) =>
       rows.reduce((a, r) => a + (f(r) ?? 0), 0);
+    // Enhancer rate is per-rep; only meaningful for a single-rep scope.
+    const rates = new Set(rows.map((r) => r.enh_rate ?? 0));
     return {
       units: sum((r) => r.units),
       newUnits: sum((r) => r.new_units),
       usedUnits: sum((r) => r.used_units),
       frontGross: sum((r) => r.front_gross_share),
+      baseCommission: sum((r) => r.base_commission),
+      enhancerDollars: sum((r) => r.enhancer_dollars),
       commission: sum((r) => r.total_commission),
       reps: rows.length,
+      enhRate:
+        rows.length === 1 || rates.size === 1 ? rows[0]?.enh_rate ?? 0 : null,
     };
   }, [mtd, selectedRep]);
 
-  const fgsByRep = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of mtd) m.set(r.rep, r.front_gross_share ?? 0);
-    return m;
-  }, [mtd]);
-
-  const overlay = useMemo(() => {
-    let flat = 0;
-    let enhancer = 0;
-    let ratePct = 0;
+  // Flat overlay = spiffs / corrections / other / flat-$ enhancers.
+  // Rate-bearing adjustments (rate_pct or a manual pct) are NOT added here —
+  // they fold into the per-deal rate and are already inside total_commission.
+  const flat = useMemo(() => {
+    let f = 0;
     for (const a of adjustments) {
-      if (a.pct != null) {
-        // Percentage-style enhancer entry (manual % spiff)
-        ratePct += a.pct;
-        enhancer += (a.pct / 100) * (fgsByRep.get(a.rep) ?? 0);
-      } else if (a.category === "enhancer") {
-        // Flat enhancers (incl. one-click approvals). Their rule rate, if
-        // any, is recorded on rate_pct; flat-cash rules leave it null.
-        ratePct += a.rate_pct ?? 0;
-        enhancer += a.amount ?? 0;
-      } else {
-        flat += a.amount ?? 0;
-      }
+      const isRate = (a.rate_pct ?? a.pct) != null;
+      if (!isRate) f += a.amount ?? 0;
     }
-    enhancer = Math.round(enhancer * 100) / 100;
-    flat = Math.round(flat * 100) / 100;
-    // "Enh %" = sum of the rule rates the rep qualified for (e.g. 3% + 2%).
-    // 2-decimal precision so 5.2% / 5.25% display correctly.
-    const totalPct = Math.round(ratePct * 100) / 100;
-    return { flat, enhancer, totalPct, any: adjustments.length > 0 };
-  }, [adjustments, fgsByRep]);
+    return Math.round(f * 100) / 100;
+  }, [adjustments]);
 
   const acqUnits = useMemo(
     () =>
@@ -149,10 +140,8 @@ export default function Dashboard({ session }: { session: Session }) {
     [deals]
   );
 
-  const projected =
-    Math.round((scoped.commission + overlay.flat + overlay.enhancer) * 100) /
-    100;
-
+  const hasOverlay = flat !== 0 || scoped.enhancerDollars !== 0;
+  const projected = Math.round((scoped.commission + flat) * 100) / 100;
 
   const formStore =
     profile?.store_name ||
@@ -252,10 +241,10 @@ export default function Dashboard({ session }: { session: Session }) {
           <div className="sticker-body">
             <div className="cell hero">
               <div className="k">
-                {overlay.any ? "Projected pay" : "Commission"}
+                {hasOverlay ? "Projected pay" : "Commission"}
               </div>
               <div className="v">
-                {moneyExact(overlay.any ? projected : scoped.commission)}
+                {moneyExact(hasOverlay ? projected : scoped.commission)}
               </div>
             </div>
             <div className="cell">
@@ -283,27 +272,31 @@ export default function Dashboard({ session }: { session: Session }) {
             <div className="cell">
               <div className="k">Enh %</div>
               <div className="v">
-                {overlay.totalPct > 0 ? `${overlay.totalPct.toFixed(2)}%` : "—"}
+                {scoped.enhRate != null && scoped.enhRate > 0
+                  ? `${scoped.enhRate.toFixed(2)}%`
+                  : "—"}
                 <small>qualified rules</small>
               </div>
             </div>
           </div>
-          {overlay.any && (
+          {hasOverlay && (
             <div className="sticker-breakdown">
               <div className="bcell">
-                <span className="k">Deal commission</span>
-                <span className="v">{moneyExact(scoped.commission)}</span>
-              </div>
-              <div className="bcell">
-                <span className="k">Spiffs &amp; corrections</span>
-                <span className="v">{moneyExact(overlay.flat)}</span>
+                <span className="k">Base commission</span>
+                <span className="v">{moneyExact(scoped.baseCommission)}</span>
               </div>
               <div className="bcell">
                 <span className="k">
                   Enhancers
-                  {overlay.totalPct > 0 ? ` (${overlay.totalPct.toFixed(2)}%)` : ""}
+                  {scoped.enhRate != null && scoped.enhRate > 0
+                    ? ` (${scoped.enhRate.toFixed(2)}%)`
+                    : ""}
                 </span>
-                <span className="v">{moneyExact(overlay.enhancer)}</span>
+                <span className="v">{moneyExact(scoped.enhancerDollars)}</span>
+              </div>
+              <div className="bcell">
+                <span className="k">Spiffs &amp; corrections</span>
+                <span className="v">{moneyExact(flat)}</span>
               </div>
             </div>
           )}
@@ -360,7 +353,6 @@ export default function Dashboard({ session }: { session: Session }) {
               canEdit={isManagerView}
               monthISO={monthStartISO(month)}
               reps={mtd.map((r) => r.rep)}
-              fgsByRep={fgsByRep}
               defaultStore={formStore}
               selectedRep={selectedRep}
               onChanged={loadData}

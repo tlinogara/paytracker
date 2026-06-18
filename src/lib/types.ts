@@ -18,7 +18,11 @@ export interface RepMtd {
   new_units: number | null;
   used_units: number | null;
   front_gross_share: number | null;
-  total_commission: number | null;
+  // --- engine-computed (phase5) ---
+  base_commission: number | null; // sum of max(base% x gross, mini) x share
+  enhancer_dollars: number | null; // mini-aware enhancer portion folded into the rate
+  total_commission: number | null; // base_commission + enhancer_dollars
+  enh_rate: number | null; // combined qualified enhancer rate, in percent points
   split_deals: number | null;
 }
 
@@ -32,7 +36,9 @@ export interface DealRow {
   vehicle: string | null;
   front_gross: number | null;
   rep_unit_count: number | null;
-  rep_commission: number | null;
+  rep_commission: number | null; // engine per-deal total (base + folded enhancer)
+  base_commission: number | null; // engine per-deal base only
+  enhancer_dollars: number | null; // engine per-deal enhancer portion
   is_split_deal: boolean | null;
   salesperson: string | null;
   dealer: string | null;
@@ -40,6 +46,16 @@ export interface DealRow {
 }
 
 export type AdjCategory = "spiff" | "enhancer" | "correction" | "other";
+
+export interface PayPlan {
+  id: string;
+  month: string; // ISO first-of-month
+  store_name: string | null; // null = all stores
+  rep_name: string | null; // null = store default
+  base_pct: number;
+  mini: number;
+  created_at: string;
+}
 
 export interface Adjustment {
   id: string;

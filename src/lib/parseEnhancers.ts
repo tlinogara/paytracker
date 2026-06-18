@@ -45,11 +45,9 @@ function extractThreshold(
   line: string
 ): { value: number; confident: boolean } {
   const cleaned = line.replace(/\d+(?:\.\d+)?\s*%/g, " ");
-  // "sell 4", "collect 3", "selling 2"
   const verbNum = /(?:sell|sold|selling|collect|acquire)\s+(\d{1,2})/i.exec(
     cleaned
   );
-  // "3 acquisitions", "4 trade", "2 pre-owned", "2+ cars"
   const numNoun =
     /\b(\d{1,2})\s*\+?\s*(?:new|used|pre-?owned|acquisition|trade|consign|car|unit|deposit|order|rolls|bentley|aston|mclaren|lamborghini)/i.exec(
       cleaned
@@ -68,8 +66,6 @@ function guessMetric(line: string): {
 } {
   const l = line.toLowerCase();
 
-  // Human-judged signals first — these override "new/used" wording that
-  // appears inside descriptive phrases like "a new or used vehicle".
   if (
     /previous client|orphan|deposit|unica|time clock|csi|avg gp|gross per|accessory|compliance|whispers|\besa\b|activation/.test(
       l
@@ -88,8 +84,6 @@ function guessMetric(line: string): {
   if (/priority|magenta/.test(l))
     return { metric: "priority_units", confident: true };
 
-  // "new" / "used" only count when paired with sell/sold AND not both words
-  // present (both => descriptive phrase, not a metric).
   const saysNew = /\bnew\b/.test(l);
   const saysUsed = /pre-?owned|\bused\b|\blbo\b/.test(l);
   const saysSell = /sell|sold/.test(l);
@@ -103,14 +97,10 @@ function guessMetric(line: string): {
   return { metric: "manual", confident: false };
 }
 
-// A line may pack two rules ("3 pre-owned OR 1 magenta"). Split on " or "
-// when both halves look rule-like, so neither is silently dropped.
 function splitOrClauses(line: string): string[] {
   if (/\bor\b/i.test(line) && /\d/.test(line)) {
     const parts = line.split(/\s+or\s+/i);
-    // Only split if at least two parts have a number (real alternatives).
     if (parts.filter((p) => /\d/.test(p)).length >= 2) {
-      // Re-attach the leading percentage to each part for context.
       const pct = /(\d+(?:\.\d+)?\s*%)/.exec(line)?.[1] ?? "";
       return parts.map((p, i) => (i === 0 ? p : `${pct} ${p}`.trim()));
     }
@@ -154,7 +144,6 @@ export function parseEnhancerText(text: string): DraftRule[] {
         flat_amount: flat,
         metric,
         threshold: th.value,
-        // Flat per-unit rules always get a look (need to confirm the metric).
         confident:
           flat == null && metricOK && th.confident && Boolean(currentBrand),
       });
