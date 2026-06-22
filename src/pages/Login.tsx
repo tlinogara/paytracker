@@ -44,9 +44,7 @@ export default function Login() {
         <span className="wordmark">
           Pay<span>Track</span>
         </span>
-        <p className="lede">
-          Your deals, units, and commission — straight from the deal log.
-        </p>
+       
 
         {err && <div className="form-msg err">{err}</div>}
         {ok && <div className="form-msg ok">{ok}</div>}
