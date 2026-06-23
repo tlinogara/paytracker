@@ -1189,3 +1189,30 @@ table.adj input.mini:focus {
   border-color: var(--green);
   color: var(--green);
 }
+
+/* ---- Leaderboards grid (added for the views-based dashboard) ---- */
+.lb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.lb-card {
+  border: 1px solid var(--line, #e6e6e6);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card, #fff);
+}
+.lb-title {
+  font-family: "Saira SemiCondensed", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 10px 12px;
+  background: var(--head, #1f2a37);
+  color: #fff;
+}
+.lb-card table.deals {
+  margin: 0;
+}
