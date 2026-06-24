@@ -1,82 +1,30 @@
-# PayTrack — rep-facing commission portal (Phase 2)
+# PayTrack
 
-A small React app where each salesperson logs in and sees their own month:
-units, front gross, commission, and every deal — pulled hourly from Tekion
-via the Phase 1 pipeline. Managers see their store's team; admins see
-everything. All of that is enforced by Postgres row-level security, not by
-app code.
+This package contains a React frontend, Supabase SQL files, and a Python ingestion script for replacing a spreadsheet based dealership commission workflow.
 
-## Stack (deliberately small)
+## Setup
 
-- **Vite + React + TypeScript** — builds to static files, no server to run
-- **@supabase/supabase-js** — login + data queries against your Phase 1 database
-- Plain CSS (`src/styles.css`) — no UI framework to fight with
+1. Create a Supabase project.
+2. Run the SQL files in order from `supabase/sql`.
+3. Copy `.env.example` to `.env` and fill in the browser safe Supabase URL and anon key.
+4. Run `npm install`.
+5. Run `npm run dev`.
 
-## Run it locally
+## Ingestion
 
-```
-npm install
-cp .env.example .env     # fill in your Supabase URL + ANON key
-npm run dev              # opens http://localhost:5173
+For local RPA ingestion, copy `scripts/.env.example` to `scripts/.env` and use a service role key only on the trusted machine that runs the Tekion downloader.
+
+```bash
+python scripts/upload_tekion_csv.py path/to/deal_sales_log.csv --store-id <uuid>
 ```
 
-The anon key is the *publishable* one (Dashboard → Settings → API). It is
-safe in the browser — RLS decides what each login can read. The
-service_role key must never appear in this project.
+## Permission model
 
-## Deploy (free, ~10 minutes)
+Salespeople can read their own deals, commission lines, and KPIs.
+Managers can read and adjust rows in their own store.
+Payroll can import, refresh, and lock commission runs.
+Admins can manage all stores, plans, employees, and rules.
 
-1. Push this folder to a GitHub repo.
-2. vercel.com → New project → import the repo. Vercel auto-detects Vite.
-3. Add the two environment variables (`VITE_SUPABASE_URL`,
-   `VITE_SUPABASE_ANON_KEY`) in the Vercel project settings → deploy.
-4. Supabase Dashboard → Authentication → URL Configuration: set **Site URL**
-   to your Vercel URL and add it to **Redirect URLs** (login links and
-   invites point here).
+## Calculation model
 
-`vercel.json` is already set up so page refreshes on any route work.
-
-## Onboarding a salesperson
-
-1. Supabase → Authentication → Users → **Invite user** (their work email).
-2. Table Editor → `profiles` → fill in their `rep_name` (exactly as Tekion
-   prints it), `store_name`, and `role` (`rep` / `manager` / `admin`).
-3. They click the invite link, land signed in, and can set a password at
-   `/update-password` — or just use "Email me a login link" every time.
-
-If a rep sees an empty dashboard, it's almost always a `rep_name` mismatch —
-run query 5 in `reconciliation.sql` to see Tekion's exact spelling.
-
-## What each role sees
-
-| Role | Summary panel | Team list | Deals |
-|---|---|---|---|
-| rep | their own month | hidden | their own rows only |
-| manager | team totals for their store | their store's reps (tap to filter) | their store |
-| admin | totals across everything visible | all reps | all stores |
-
-## Spiffs, corrections & enhancers (Phase 3)
-
-Manual money never touches the `deals` table (the hourly loader would
-overwrite it). It lives in `adjustments` — run `phase3_adjustments.sql`
-in the Supabase SQL Editor to create it.
-
-- **Managers and admins** get a "Spiffs & enhancers" section on the
-  dashboard: add a flat dollar amount (spiff / correction / other) or an
-  enhancer **percentage**, optionally tied to a deal number, with a note.
-  Managers can only write entries for their own store; reps can only read
-  their own. Every entry records who created it.
-- **Percentages** are computed as pct × the rep's unit-weighted front gross
-  for that month. Verify this against payroll's hand-calc the first month;
-  if the pay plan uses a different base, enter flat dollar amounts instead.
-- The summary panel shows **Projected pay = deal commission + spiffs &
-  corrections + enhancers** with the breakdown underneath.
-- Payroll's period-end numbers: query the `rep_month_pay` view, plus
-  `select * from adjustments where month = '2026-06-01'` for the audit trail.
-
-## Later candidates
-
-- Auto-qualification of enhancers from the monthly criteria lists
-- Manager pay plans (paid off different gross — data is already stored)
-- Pay-period (vs calendar month) date ranges
-- CSV export button for payroll
+Tekion CSV rows go first into raw import tables. The SQL normalizer maps rows to deals and participants. The server side refresh function writes commission lines, and the React app only displays those calculated lines plus manager approved adjustments.

@@ -2,17 +2,7 @@ import { useMemo, useState } from "react";
 import type { DealRow } from "../lib/types";
 import { isNewStock, moneyExact, money, shortDate, units } from "../lib/format";
 
-type SortKey =
-  | "date"
-  | "deal"
-  | "rep"
-  | "customer"
-  | "make"
-  | "nu"
-  | "unit"
-  | "front"
-  | "comm";
-
+type SortKey = "date" | "deal" | "rep" | "customer" | "make" | "nu" | "unit" | "front" | "comm";
 type Dir = "asc" | "desc";
 
 const ACCESSORS: Record<SortKey, (d: DealRow) => string | number | null> = {
@@ -32,7 +22,7 @@ const ACCESSORS: Record<SortKey, (d: DealRow) => string | number | null> = {
 
 function compare(a: string | number | null, b: string | number | null): number {
   if (a == null && b == null) return 0;
-  if (a == null) return 1; // nulls always sink to the bottom
+  if (a == null) return 1;
   if (b == null) return -1;
   if (typeof a === "number" && typeof b === "number") return a - b;
   return String(a).localeCompare(String(b));
@@ -62,43 +52,29 @@ function Th({
   );
 }
 
-export default function DealsTable({
-  deals,
-  showRep,
-}: {
-  deals: DealRow[];
-  showRep: boolean;
-}) {
-  const [sort, setSort] = useState<{ key: SortKey; dir: Dir }>({
-    key: "date",
-    dir: "desc",
-  });
+export default function DealsTable({ deals, showRep }: { deals: DealRow[]; showRep: boolean }) {
+  const [sort, setSort] = useState<{ key: SortKey; dir: Dir }>({ key: "date", dir: "desc" });
 
   function onSort(k: SortKey) {
     setSort((s) =>
       s.key === k
         ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" }
-        : // money/units feel best starting big-first; text starts A→Z
-          { key: k, dir: k === "unit" || k === "front" || k === "comm" || k === "date" ? "desc" : "asc" }
+        : { key: k, dir: k === "unit" || k === "front" || k === "comm" || k === "date" ? "desc" : "asc" }
     );
   }
 
   const sorted = useMemo(() => {
     const acc = ACCESSORS[sort.key];
-    const arr = [...deals].sort((a, b) => {
+    return [...deals].sort((a, b) => {
       const c = compare(acc(a), acc(b));
       return sort.dir === "asc" ? c : -c;
     });
-    return arr;
   }, [deals, sort]);
 
   if (deals.length === 0) {
     return (
       <div className="tablewrap">
-        <div className="empty">
-          No deals recorded for this month yet. Data refreshes hourly from the
-          deal log.
-        </div>
+        <div className="empty">No deals recorded for this month yet. Data refreshes from the Tekion deal log.</div>
       </div>
     );
   }
@@ -113,10 +89,10 @@ export default function DealsTable({
             {showRep && <Th label="Rep" k="rep" sort={sort} onSort={onSort} />}
             <Th label="Customer / vehicle" k="customer" sort={sort} onSort={onSort} />
             <Th label="Brand" k="make" sort={sort} onSort={onSort} />
-            <Th label="N/U/A" k="nu" sort={sort} onSort={onSort} />
+            <Th label="N / U / A" k="nu" sort={sort} onSort={onSort} />
             <Th label="Unit" k="unit" sort={sort} onSort={onSort} right />
             <Th label="Front gross" k="front" sort={sort} onSort={onSort} right />
-            <Th label="My commission" k="comm" sort={sort} onSort={onSort} right />
+            <Th label="Commission" k="comm" sort={sort} onSort={onSort} right />
             <th></th>
           </tr>
         </thead>
@@ -128,9 +104,7 @@ export default function DealsTable({
             return (
               <tr key={`${d.deal_number}-${d.rep}`}>
                 <td className="num">{shortDate(d.contract_date)}</td>
-                <td>
-                  <span className="deal-no">#{d.deal_number}</span>
-                </td>
+                <td><span className="deal-no">#{d.deal_number}</span></td>
                 {showRep && <td>{d.rep || "—"}</td>}
                 <td>
                   {d.customer || "—"}
@@ -144,25 +118,13 @@ export default function DealsTable({
                   ) : isNew == null ? (
                     "—"
                   ) : (
-                    <span className={`badge ${isNew ? "new" : "used"}`}>
-                      {isNew ? "New" : "Used"}
-                    </span>
+                    <span className={`badge ${isNew ? "new" : "used"}`}>{isNew ? "New" : "Used"}</span>
                   )}
                 </td>
                 <td className="r num">{units(d.rep_unit_count)}</td>
-                <td className={`r money ${fg != null && fg < 0 ? "neg" : ""}`}>
-                  {money(fg)}
-                </td>
-                <td className={`r money ${comm < 0 ? "neg" : "pos"}`}>
-                  {moneyExact(comm)}
-                </td>
-                <td>
-                  {d.is_split_deal && (
-                    <span className="badge split" title={d.salesperson ?? ""}>
-                      Split
-                    </span>
-                  )}
-                </td>
+                <td className={`r money ${fg != null && fg < 0 ? "neg" : ""}`}>{money(fg)}</td>
+                <td className={`r money ${comm < 0 ? "neg" : "pos"}`}>{moneyExact(comm)}</td>
+                <td>{d.is_split_deal && <span className="badge split" title={d.salesperson ?? ""}>Split</span>}</td>
               </tr>
             );
           })}

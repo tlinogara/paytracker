@@ -23,29 +23,15 @@ function dateToParam(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/**
- * Selected month, stored in the URL (?month=YYYY-MM) so it persists across
- * navigation between Dashboard and Enhancers, survives refresh, and makes
- * links shareable. Falls back to the current month when absent or invalid.
- *
- * IMPORTANT: the returned `month` Date is memoized on the canonical
- * "YYYY-MM" string, so its reference is stable across renders while the
- * month is unchanged. Effects that depend on `month` therefore fire only
- * when the month actually changes — not on every render.
- */
 export function useMonth(): {
   month: Date;
-  monthParam: string; // canonical "YYYY-MM"
+  monthParam: string;
   setMonth: (d: Date) => void;
   isCurrentMonth: boolean;
 } {
   const [params, setParams] = useSearchParams();
   const raw = params.get("month");
-
-  // Canonical string is the source of truth; the Date is derived from it.
   const monthParam = isValidMonthParam(raw) ? raw : currentMonthParam();
-
-  // Stable Date reference: only rebuilt when monthParam changes.
   const month = useMemo(() => paramToDate(monthParam), [monthParam]);
 
   const setMonth = useCallback(
@@ -54,7 +40,6 @@ export function useMonth(): {
       setParams(
         (prev) => {
           const next = new URLSearchParams(prev);
-          // Omit the param for the current month to keep URLs clean.
           if (target === currentMonthParam()) next.delete("month");
           else next.set("month", target);
           return next;

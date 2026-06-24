@@ -1,4 +1,10 @@
-export type Role = "rep" | "manager" | "admin";
+export type Role = "rep" | "manager" | "payroll" | "admin";
+
+export interface Store {
+  id: string;
+  name: string;
+  active: boolean;
+}
 
 export interface Profile {
   id: string;
@@ -6,13 +12,17 @@ export interface Profile {
   full_name: string | null;
   rep_name: string | null;
   store_name: string | null;
+  employee_id: string | null;
+  store_id: string | null;
   role: Role;
 }
 
 export interface RepMtd {
+  employee_id: string | null;
+  store_id: string | null;
   rep: string;
   dealer: string | null;
-  month: string; // ISO date, first of month
+  month: string;
   deal_rows: number;
   units: number | null;
   new_units: number | null;
@@ -23,6 +33,9 @@ export interface RepMtd {
 }
 
 export interface DealRow {
+  deal_id: string | null;
+  employee_id: string | null;
+  store_id: string | null;
   deal_number: string;
   rep: string;
   contract_date: string | null;
@@ -45,7 +58,9 @@ export interface Adjustment {
   id: string;
   rep: string;
   store: string;
-  month: string; // ISO first-of-month
+  employee_id: string | null;
+  store_id: string | null;
+  month: string;
   deal_number: string | null;
   category: AdjCategory;
   amount: number | null;
@@ -69,10 +84,11 @@ export type EnhancerMetric =
 export interface EnhancerRule {
   id: string;
   month: string;
+  store_id: string | null;
   brand: string;
   make_pattern: string;
   label: string;
-  pct: number;
+  pct: number | null;
   flat_amount: number | null;
   metric: EnhancerMetric;
   threshold: number;
@@ -81,16 +97,56 @@ export interface EnhancerRule {
 export interface EnhancerStatus {
   rule_id: string;
   month: string;
+  store_id: string | null;
   brand: string;
   label: string;
-  pct: number;
+  pct: number | null;
   flat_amount: number | null;
   metric: Exclude<EnhancerMetric, "manual">;
   threshold: number;
   rep: string;
+  employee_id: string | null;
   dealer: string | null;
   metric_value: number | null;
   brand_front_gross: number | null;
   qualified: boolean;
   proposed_amount: number | null;
+}
+
+export interface CommissionLine {
+  id: string;
+  run_id: string;
+  month: string;
+  store_id: string | null;
+  employee_id: string | null;
+  rep: string;
+  deal_number: string | null;
+  line_type: string;
+  amount: number;
+  explanation: string | null;
+  source_table: string | null;
+  source_id: string | null;
+  created_at: string;
+}
+
+export interface CommissionRun {
+  id: string;
+  month: string;
+  store_id: string | null;
+  store_name: string | null;
+  status: "preview" | "locked" | "paid";
+  created_at: string;
+  refreshed_at: string | null;
+  locked_at: string | null;
+  locked_by: string | null;
+}
+
+export interface ImportFile {
+  id: string;
+  source: string;
+  store_id: string | null;
+  file_name: string;
+  file_hash: string | null;
+  row_count: number | null;
+  imported_at: string;
 }

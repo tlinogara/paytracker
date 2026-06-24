@@ -52,3 +52,7 @@ export function isNewStock(stockType: string | null): boolean | null {
   if (s.includes("used") || s.includes("pre")) return false;
   return null;
 }
+
+export function safeCount(n: number | null | undefined): number {
+  return n ?? 0;
+}
