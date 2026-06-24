@@ -6,6 +6,55 @@ import { parseCsv, sha256 } from "../lib/csv";
 import Topbar from "../components/Topbar";
 import { shortDate } from "../lib/format";
 
+type CsvRow = Record<string, string>;
+
+function cleanCell(value: string | undefined): string | null {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed || trimmed === "-") return null;
+  return trimmed;
+}
+
+function parseTekionDate(value: string | undefined): Date | null {
+  const raw = cleanCell(value);
+  if (!raw) return null;
+
+  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(raw);
+  if (!match) return null;
+
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  const year = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 2000) return null;
+
+  return new Date(year, month - 1, 1);
+}
+
+function monthStartISO(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+function detectImportMonths(rows: CsvRow[]): string[] {
+  const months = new Set<string>();
+
+  for (const row of rows) {
+    const dealNumber = cleanCell(row["Deal Number"]);
+    if (!dealNumber) continue;
+
+    const contractDate = parseTekionDate(row["Contract Date"]);
+    if (contractDate) months.add(monthStartISO(contractDate));
+  }
+
+  return Array.from(months).sort();
+}
+
+function monthLabelFromISO(iso: string): string {
+  const [year, month] = iso.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export default function Imports({ session }: { session: Session }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [imports, setImports] = useState<ImportFile[]>([]);
@@ -15,11 +64,21 @@ export default function Imports({ session }: { session: Session }) {
   const [ok, setOk] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.from("profiles").select("*").eq("id", session.user.id).single().then(({ data }) => setProfile((data as Profile) ?? null));
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", session.user.id)
+      .single()
+      .then(({ data }) => setProfile((data as Profile) ?? null));
   }, [session.user.id]);
 
   async function loadImports() {
-    const { data, error } = await supabase.from("raw_import_files").select("*").order("imported_at", { ascending: false }).limit(25);
+    const { data, error } = await supabase
+      .from("raw_import_files")
+      .select("*")
+      .order("imported_at", { ascending: false })
+      .limit(25);
+
     if (error) setErr(error.message);
     else setImports((data ?? []) as ImportFile[]);
   }
@@ -28,15 +87,32 @@ export default function Imports({ session }: { session: Session }) {
     loadImports();
   }, []);
 
+  async function refreshMonths(months: string[]) {
+    if (months.length === 0) {
+      throw new Error("No valid Contract Date values were found, so no commission month could be refreshed.");
+    }
+
+    for (const month of months) {
+      const { error } = await supabase.rpc("refresh_commission_preview", {
+        p_month: month,
+        p_store_id: profile?.store_id ?? null,
+      });
+      if (error) throw error;
+    }
+  }
+
   async function upload() {
     setErr(null);
     setOk(null);
     if (!file) return;
+
     setBusy(true);
     try {
       const text = await file.text();
       const rows = parseCsv(text);
       const hash = await sha256(text);
+      const months = detectImportMonths(rows);
+
       const { data: importRow, error: importErr } = await supabase
         .from("raw_import_files")
         .insert({
@@ -48,18 +124,47 @@ export default function Imports({ session }: { session: Session }) {
         })
         .select("id")
         .single();
-      if (importErr) throw importErr;
+
+      if (importErr) {
+        if (importErr.code === "23505") {
+          await refreshMonths(months);
+          setOk(
+            `That file was already uploaded. Refreshed commission preview for ${months
+              .map(monthLabelFromISO)
+              .join(", ")}.`
+          );
+          loadImports();
+          return;
+        }
+        throw importErr;
+      }
+
       const importId = importRow.id as string;
-      const payload = rows.map((raw_json, index) => ({ import_file_id: importId, row_number: index + 2, raw_json }));
+      const payload = rows.map((raw_json, index) => ({
+        import_file_id: importId,
+        row_number: index + 2,
+        raw_json,
+      }));
+
       for (let i = 0; i < payload.length; i += 500) {
-        const { error } = await supabase.from("raw_tekion_rows").insert(payload.slice(i, i + 500));
+        const { error } = await supabase
+          .from("raw_tekion_rows")
+          .insert(payload.slice(i, i + 500));
         if (error) throw error;
       }
-      const { error: normErr } = await supabase.rpc("normalize_tekion_import", { p_import_file_id: importId });
+
+      const { error: normErr } = await supabase.rpc("normalize_tekion_import", {
+        p_import_file_id: importId,
+      });
       if (normErr) throw normErr;
-      const { error: calcErr } = await supabase.rpc("refresh_commission_preview", { p_month: null, p_store_id: profile?.store_id ?? null });
-      if (calcErr) throw calcErr;
-      setOk(`Imported ${rows.length} Tekion rows and refreshed commission previews.`);
+
+      await refreshMonths(months);
+
+      setOk(
+        `Imported ${rows.length} Tekion rows and refreshed commission preview for ${months
+          .map(monthLabelFromISO)
+          .join(", ")}.`
+      );
       setFile(null);
       loadImports();
     } catch (e) {
@@ -75,24 +180,57 @@ export default function Imports({ session }: { session: Session }) {
     <>
       <Topbar profile={profile} />
       <main className="page">
-        <div className="section-head"><h2>Tekion imports</h2><span className="count">raw file staging</span></div>
+        <div className="section-head">
+          <h2>Tekion imports</h2>
+          <span className="count">raw file staging</span>
+        </div>
         {err && <div className="notice">{err}</div>}
         {ok && <div className="form-msg ok">{ok}</div>}
-        {!canImport && profile && <div className="notice">Only payroll and admins can import Tekion files.</div>}
+        {!canImport && profile && (
+          <div className="notice">Only payroll and admins can import Tekion files.</div>
+        )}
         {canImport && (
           <section className="tablewrap padbox">
             <div className="field">
               <label htmlFor="csv">Tekion deal sales log CSV</label>
-              <input id="csv" type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              <input
+                id="csv"
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
             </div>
-            <button className="btn-primary slim" disabled={!file || busy} onClick={upload}>{busy ? "Importing…" : "Upload and process"}</button>
+            <button className="btn-primary slim" disabled={!file || busy} onClick={upload}>
+              {busy ? "Importing…" : "Upload and process"}
+            </button>
           </section>
         )}
-        <div className="section-head"><h2>Recent imports</h2><span className="count">{imports.length} file(s)</span></div>
+        <div className="section-head">
+          <h2>Recent imports</h2>
+          <span className="count">{imports.length} file(s)</span>
+        </div>
         <div className="tablewrap">
           <table className="deals adj">
-            <thead><tr><th>Date</th><th>File</th><th>Source</th><th className="r">Rows</th><th>Hash</th></tr></thead>
-            <tbody>{imports.map((f) => <tr key={f.id}><td className="num">{shortDate(f.imported_at.slice(0, 10))}</td><td>{f.file_name}</td><td>{f.source}</td><td className="r num">{f.row_count ?? 0}</td><td className="note-cell">{f.file_hash?.slice(0, 16) ?? "—"}</td></tr>)}</tbody>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>File</th>
+                <th>Source</th>
+                <th className="r">Rows</th>
+                <th>Hash</th>
+              </tr>
+            </thead>
+            <tbody>
+              {imports.map((f) => (
+                <tr key={f.id}>
+                  <td className="num">{shortDate(f.imported_at.slice(0, 10))}</td>
+                  <td>{f.file_name}</td>
+                  <td>{f.source}</td>
+                  <td className="r num">{f.row_count ?? 0}</td>
+                  <td className="note-cell">{f.file_hash?.slice(0, 16) ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       </main>

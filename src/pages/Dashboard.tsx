@@ -10,7 +10,7 @@ import DealsTable from "../components/DealsTable";
 import Adjustments from "../components/Adjustments";
 import Collapsible from "../components/Collapsible";
 
-const DEAL_COLUMNS = "deal_id, employee_id, store_id, deal_number, rep, contract_date, status, stock_type, customer, vehicle, front_gross, rep_unit_count, rep_commission, is_split_deal, salesperson, dealer, make";
+const DEAL_COLUMNS = "deal_id, employee_id, store_id, deal_number, stock_number, rep, contract_date, status, stock_type, customer, vehicle, front_gross, rep_unit_count, rep_commission, spiffs, is_split_deal, salesperson, dealer, make";
 
 function isAcquisitionRow(d: DealRow): boolean {
   return !d.make || !d.make.trim();

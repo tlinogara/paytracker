@@ -37,6 +37,7 @@ export interface DealRow {
   employee_id: string | null;
   store_id: string | null;
   deal_number: string;
+  stock_number: string | null;
   rep: string;
   contract_date: string | null;
   status: string | null;
@@ -46,6 +47,7 @@ export interface DealRow {
   front_gross: number | null;
   rep_unit_count: number | null;
   rep_commission: number | null;
+  spiffs: number | null;
   is_split_deal: boolean | null;
   salesperson: string | null;
   dealer: string | null;

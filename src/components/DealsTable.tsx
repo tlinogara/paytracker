@@ -2,7 +2,19 @@ import { useMemo, useState } from "react";
 import type { DealRow } from "../lib/types";
 import { isNewStock, moneyExact, money, shortDate, units } from "../lib/format";
 
-type SortKey = "date" | "deal" | "rep" | "customer" | "make" | "nu" | "unit" | "front" | "comm";
+type SortKey =
+  | "date"
+  | "deal"
+  | "stock"
+  | "rep"
+  | "customer"
+  | "make"
+  | "nu"
+  | "unit"
+  | "front"
+  | "spiffs"
+  | "comm";
+
 type Dir = "asc" | "desc";
 
 const ACCESSORS: Record<SortKey, (d: DealRow) => string | number | null> = {
@@ -11,12 +23,14 @@ const ACCESSORS: Record<SortKey, (d: DealRow) => string | number | null> = {
     const n = Number(d.deal_number);
     return Number.isNaN(n) ? d.deal_number : n;
   },
+  stock: (d) => d.stock_number?.toLowerCase() ?? null,
   rep: (d) => d.rep?.toLowerCase() ?? null,
   customer: (d) => d.customer?.toLowerCase() ?? null,
   make: (d) => d.make?.toLowerCase() ?? null,
   nu: (d) => d.stock_type?.toLowerCase() ?? null,
   unit: (d) => d.rep_unit_count,
   front: (d) => d.front_gross,
+  spiffs: (d) => d.spiffs,
   comm: (d) => d.rep_commission,
 };
 
@@ -59,7 +73,7 @@ export default function DealsTable({ deals, showRep }: { deals: DealRow[]; showR
     setSort((s) =>
       s.key === k
         ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" }
-        : { key: k, dir: k === "unit" || k === "front" || k === "comm" || k === "date" ? "desc" : "asc" }
+        : { key: k, dir: k === "unit" || k === "front" || k === "spiffs" || k === "comm" || k === "date" ? "desc" : "asc" }
     );
   }
 
@@ -86,12 +100,14 @@ export default function DealsTable({ deals, showRep }: { deals: DealRow[]; showR
           <tr>
             <Th label="Date" k="date" sort={sort} onSort={onSort} />
             <Th label="Deal" k="deal" sort={sort} onSort={onSort} />
+            <Th label="Stock #" k="stock" sort={sort} onSort={onSort} />
             {showRep && <Th label="Rep" k="rep" sort={sort} onSort={onSort} />}
             <Th label="Customer / vehicle" k="customer" sort={sort} onSort={onSort} />
             <Th label="Brand" k="make" sort={sort} onSort={onSort} />
             <Th label="N / U / A" k="nu" sort={sort} onSort={onSort} />
             <Th label="Unit" k="unit" sort={sort} onSort={onSort} right />
             <Th label="Front gross" k="front" sort={sort} onSort={onSort} right />
+            <Th label="Spiffs" k="spiffs" sort={sort} onSort={onSort} right />
             <Th label="Commission" k="comm" sort={sort} onSort={onSort} right />
             <th></th>
           </tr>
@@ -100,11 +116,13 @@ export default function DealsTable({ deals, showRep }: { deals: DealRow[]; showR
           {sorted.map((d) => {
             const isNew = isNewStock(d.stock_type);
             const comm = d.rep_commission ?? 0;
+            const spiffs = d.spiffs ?? 0;
             const fg = d.front_gross;
             return (
-              <tr key={`${d.deal_number}-${d.rep}`}>
+              <tr key={`${d.deal_number}-${d.stock_number ?? "no-stock"}-${d.rep}`}>
                 <td className="num">{shortDate(d.contract_date)}</td>
                 <td><span className="deal-no">#{d.deal_number}</span></td>
+                <td><span className="deal-no">{d.stock_number || "—"}</span></td>
                 {showRep && <td>{d.rep || "—"}</td>}
                 <td>
                   {d.customer || "—"}
@@ -123,6 +141,7 @@ export default function DealsTable({ deals, showRep }: { deals: DealRow[]; showR
                 </td>
                 <td className="r num">{units(d.rep_unit_count)}</td>
                 <td className={`r money ${fg != null && fg < 0 ? "neg" : ""}`}>{money(fg)}</td>
+                <td className={`r money ${spiffs < 0 ? "neg" : spiffs > 0 ? "pos" : ""}`}>{moneyExact(spiffs)}</td>
                 <td className={`r money ${comm < 0 ? "neg" : "pos"}`}>{moneyExact(comm)}</td>
                 <td>{d.is_split_deal && <span className="badge split" title={d.salesperson ?? ""}>Split</span>}</td>
               </tr>
