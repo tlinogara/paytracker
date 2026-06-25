@@ -34,7 +34,7 @@ export default function Adjustments({
   onChanged: () => void;
 }) {
   const [rep, setRep] = useState(selectedRep ?? "");
-  const [category, setCategory] = useState("spiff");
+  const [category, setCategory] = useState<AdjCategory | string>("spiff");
   const [amount, setAmount] = useState("");
   const [pct, setPct] = useState("");
   const [dealNumber, setDealNumber] = useState("");
