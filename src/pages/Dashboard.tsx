@@ -143,35 +143,50 @@ export default function Dashboard({ session }: { session: Session }) {
   const repRows = useMemo(() => {
     const start = monthStartISO(month);
     const byRep = new Map<string, RepMtd>();
-
-    for (const r of mtd) {
-      if (r.rep) byRep.set(r.rep, { ...r });
-    }
+    const dealSummary = new Map<string, RepMtd>();
 
     for (const d of allDeals) {
       if (!d.rep) continue;
-      const hasServerSummary = byRep.has(d.rep);
-      const row = byRep.get(d.rep) ?? emptyRepRow(d.rep, start);
+      const row = dealSummary.get(d.rep) ?? emptyRepRow(d.rep, start);
       row.employee_id = row.employee_id ?? d.employee_id;
       row.store_id = row.store_id ?? d.store_id;
       row.dealer = row.dealer ?? d.dealer;
+      row.deal_rows = (row.deal_rows ?? 0) + 1;
+      row.total_commission = (row.total_commission ?? 0) + (d.rep_commission ?? 0);
+      row.split_deals = (row.split_deals ?? 0) + (d.is_split_deal ? 1 : 0);
 
-      if (!hasServerSummary) {
-        row.deal_rows = (row.deal_rows ?? 0) + 1;
-        row.total_commission = (row.total_commission ?? 0) + (d.rep_commission ?? 0);
-        row.split_deals = (row.split_deals ?? 0) + (d.is_split_deal ? 1 : 0);
-
-        if (!isAcquisitionRow(d)) {
-          const unitCount = d.rep_unit_count ?? 0;
-          row.units = (row.units ?? 0) + unitCount;
-          row.front_gross_share = (row.front_gross_share ?? 0) + ((d.front_gross ?? 0) * unitCount);
-          const stockKind = isNewStock(d.stock_type);
-          if (stockKind === true) row.new_units = (row.new_units ?? 0) + unitCount;
-          if (stockKind === false) row.used_units = (row.used_units ?? 0) + unitCount;
-        }
+      if (!isAcquisitionRow(d)) {
+        const unitCount = d.rep_unit_count ?? 0;
+        row.units = (row.units ?? 0) + unitCount;
+        row.front_gross_share = (row.front_gross_share ?? 0) + (d.front_gross ?? 0);
+        const stockKind = isNewStock(d.stock_type);
+        if (stockKind === true) row.new_units = (row.new_units ?? 0) + unitCount;
+        if (stockKind === false) row.used_units = (row.used_units ?? 0) + unitCount;
       }
 
-      byRep.set(d.rep, row);
+      dealSummary.set(d.rep, row);
+    }
+
+    for (const r of mtd) {
+      if (!r.rep) continue;
+      const fallback = dealSummary.get(r.rep);
+      byRep.set(r.rep, {
+        ...r,
+        employee_id: r.employee_id ?? fallback?.employee_id ?? null,
+        store_id: r.store_id ?? fallback?.store_id ?? null,
+        dealer: r.dealer ?? fallback?.dealer ?? null,
+        deal_rows: (r.deal_rows ?? 0) || fallback?.deal_rows || 0,
+        units: (r.units ?? 0) || fallback?.units || 0,
+        new_units: (r.new_units ?? 0) || fallback?.new_units || 0,
+        used_units: (r.used_units ?? 0) || fallback?.used_units || 0,
+        front_gross_share: (r.front_gross_share ?? 0) || fallback?.front_gross_share || 0,
+        total_commission: (r.total_commission ?? 0) || fallback?.total_commission || 0,
+        split_deals: (r.split_deals ?? 0) || fallback?.split_deals || 0,
+      });
+    }
+
+    for (const [rep, row] of dealSummary) {
+      if (!byRep.has(rep)) byRep.set(rep, row);
     }
 
     return Array.from(byRep.values()).sort((a, b) => {
@@ -183,16 +198,19 @@ export default function Dashboard({ session }: { session: Session }) {
 
   const scoped = useMemo(() => {
     const rows = selectedRep ? repRows.filter((r) => r.rep === selectedRep) : repRows;
+    const visibleDeals = selectedRep ? allDeals.filter((d) => d.rep === selectedRep) : allDeals;
+    const dealCommission = visibleDeals.reduce((a, d) => a + (d.rep_commission ?? 0), 0);
     const sum = (f: (r: RepMtd) => number | null) => rows.reduce((a, r) => a + (f(r) ?? 0), 0);
+    const summaryCommission = sum((r) => r.total_commission);
     return {
       units: sum((r) => r.units),
       newUnits: sum((r) => r.new_units),
       usedUnits: sum((r) => r.used_units),
       frontGross: sum((r) => r.front_gross_share),
-      commission: sum((r) => r.total_commission),
+      commission: summaryCommission || dealCommission,
       reps: rows.length,
     };
-  }, [repRows, selectedRep]);
+  }, [allDeals, repRows, selectedRep]);
 
   const fgsByRep = useMemo(() => {
     const out = new Map<string, number>();
@@ -207,7 +225,8 @@ export default function Dashboard({ session }: { session: Session }) {
 
   const formStore = profile?.store_name || (selectedRep ? repRows.find((r) => r.rep === selectedRep)?.dealer ?? null : null) || (repRows.length > 0 ? repRows[0].dealer : null);
   const scopeLabel = selectedRep ? selectedRep : profile?.role === "rep" ? (profile.rep_name ?? "") : `Team · ${scoped.reps} rep${scoped.reps === 1 ? "" : "s"}`;
-  const hasRowsWithoutSummary = mtd.length === 0 && allDeals.length > 0;
+  const dealCommissionTotal = useMemo(() => allDeals.reduce((a, d) => a + (d.rep_commission ?? 0), 0), [allDeals]);
+  const hasRowsWithoutSummary = (mtd.length === 0 && allDeals.length > 0) || (scoped.commission === 0 && dealCommissionTotal !== 0);
 
   return (
     <>

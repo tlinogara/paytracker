@@ -8,6 +8,38 @@ import Topbar from "../components/Topbar";
 import MonthBar from "../components/MonthBar";
 import Collapsible from "../components/Collapsible";
 
+
+function dedupeMtdRows(rows: RepMtd[]): RepMtd[] {
+  const byRep = new Map<string, RepMtd>();
+
+  for (const row of rows) {
+    const key = row.employee_id ?? row.rep;
+    const existing = byRep.get(key);
+
+    if (!existing) {
+      byRep.set(key, { ...row });
+      continue;
+    }
+
+    existing.employee_id = existing.employee_id ?? row.employee_id;
+    existing.store_id = existing.store_id ?? row.store_id;
+    existing.dealer = existing.dealer ?? row.dealer;
+    existing.deal_rows = Math.max(existing.deal_rows ?? 0, row.deal_rows ?? 0);
+    existing.units = Math.max(existing.units ?? 0, row.units ?? 0);
+    existing.new_units = Math.max(existing.new_units ?? 0, row.new_units ?? 0);
+    existing.used_units = Math.max(existing.used_units ?? 0, row.used_units ?? 0);
+    existing.front_gross_share = Math.max(existing.front_gross_share ?? 0, row.front_gross_share ?? 0);
+    existing.total_commission = Math.max(existing.total_commission ?? 0, row.total_commission ?? 0);
+    existing.split_deals = Math.max(existing.split_deals ?? 0, row.split_deals ?? 0);
+  }
+
+  return Array.from(byRep.values()).sort((a, b) => {
+    const byCommission = (b.total_commission ?? 0) - (a.total_commission ?? 0);
+    if (byCommission !== 0) return byCommission;
+    return a.rep.localeCompare(b.rep);
+  });
+}
+
 export default function Payroll({ session }: { session: Session }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const { month, setMonth, isCurrentMonth } = useMonth();
@@ -45,7 +77,7 @@ export default function Payroll({ session }: { session: Session }) {
     else setRuns((runRes.data ?? []) as CommissionRun[]);
 
     if (mtdRes.error) setErr(mtdRes.error.message);
-    else setMtd((mtdRes.data ?? []) as RepMtd[]);
+    else setMtd(dedupeMtdRows((mtdRes.data ?? []) as RepMtd[]));
   }
 
   useEffect(() => {
@@ -56,9 +88,10 @@ export default function Payroll({ session }: { session: Session }) {
     setBusy(true);
     setErr(null);
     setOk(null);
+    const refreshStoreId = profile?.role === "manager" ? profile.store_id : null;
     const { error } = await supabase.rpc("refresh_commission_preview", {
       p_month: monthISO,
-      p_store_id: profile?.store_id ?? null,
+      p_store_id: refreshStoreId,
     });
     setBusy(false);
 
