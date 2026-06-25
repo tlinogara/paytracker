@@ -7,6 +7,7 @@ export default function Topbar({ profile }: { profile: Profile | null }) {
   const role = profile?.role;
   const canManage = role === "manager" || role === "payroll" || role === "admin";
   const canAdmin = role === "payroll" || role === "admin";
+  const isAdmin = role === "admin";
   const monthLink = useMonthLink();
 
   return (
@@ -31,6 +32,11 @@ export default function Topbar({ profile }: { profile: Profile | null }) {
         {canAdmin && (
           <Link className="btn-ghost" to={monthLink("/payroll")}>
             Payroll
+          </Link>
+        )}
+        {isAdmin && (
+          <Link className="btn-ghost" to={monthLink("/calculations")}>
+            Calculations
           </Link>
         )}
         <span className="who">
