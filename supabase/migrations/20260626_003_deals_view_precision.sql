@@ -1,0 +1,16 @@
+create or replace view public.deals as
+select d.id deal_id, dp.employee_id, d.store_id, d.deal_number, coalesce(e.display_name, dp.source_name, ''::text) rep, d.contract_date, d.status, d.stock_type, d.customer, coalesce(d.vehicle, concat_ws(' '::text, d.year::text, d.make, d.model)) vehicle, round(coalesce(d.front_gross,0::numeric)*dp.split_pct,2) front_gross, dp.split_pct rep_unit_count, round(coalesce(ls.total_commission,0::numeric),2) rep_commission, exists(select 1 from public.deal_participants x where x.deal_id=d.id and x.employee_id is distinct from dp.employee_id) is_split_deal, dp.source_name salesperson, d.dealer, d.make, d.stock_number, round(coalesce(ls.spiffs,0::numeric),2) spiffs, round(coalesce(ls.total_enhancers,0::numeric),2) total_enhancers, round(coalesce(ls.trade_spiffs,0::numeric),2) trade_spiffs, round(coalesce(ls.base_commission,0::numeric),2) base_commission, round(coalesce(ls.unit_enhancement,0::numeric),2) unit_enhancement
+from public.sales_deals d
+join public.deal_participants dp on dp.deal_id=d.id
+left join public.employees e on e.id=dp.employee_id
+left join lateral (
+  select cr2.id from public.commission_runs cr2
+  where cr2.month=date_trunc('month', d.contract_date)::date and (cr2.store_id is not distinct from d.store_id or cr2.store_id is null) and cr2.status=any(array['preview'::text,'locked'::text,'paid'::text])
+  order by case when cr2.store_id is not null then 0 else 1 end, case cr2.status when 'locked' then 0 when 'paid' then 1 else 2 end, cr2.refreshed_at desc nulls last, cr2.created_at desc, cr2.id desc
+  limit 1
+) cur on true
+left join lateral (
+  select sum(cl.amount) total_commission, sum(cl.amount) filter(where cl.line_type='deal_base') base_commission, sum(cl.amount) filter(where cl.line_type='unit_enhancement') unit_enhancement, sum(cl.amount) filter(where cl.line_type='spiff') spiffs, sum(cl.amount) filter(where cl.line_type=any(array['enhancer'::text,'enhanced_mini'::text])) total_enhancers, sum(cl.amount) filter(where cl.line_type='trade_spiff') trade_spiffs
+  from public.commission_lines cl
+  where cl.run_id=cur.id and cl.deal_id=d.id and cl.employee_id is not distinct from dp.employee_id
+) ls on true;
