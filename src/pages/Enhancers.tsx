@@ -110,10 +110,11 @@ export default function Enhancers({ session }: { session: Session }) {
 
   async function approve(s: EnhancerStatus) {
     setErr(null);
+    const isFlat = s.flat_amount != null;
     const amount = s.proposed_amount ?? 0;
-    const note = s.flat_amount != null
+    const note = isFlat
       ? `${s.brand}: ${s.label} · ${units(s.metric_value)}/${units(s.threshold)} qualified · ${moneyExact(s.flat_amount)} per unit`
-      : `${s.brand}: ${s.label} · ${units(s.metric_value)}/${units(s.threshold)} qualified · ${s.pct}% of ${money(s.brand_front_gross)}`;
+      : `${s.brand}: ${s.label} · ${units(s.metric_value)}/${units(s.threshold)} qualified · ${s.pct}% of ${money(s.total_commissionable_gross)} total commissionable gross`;
     const { error } = await supabase.from("adjustments").insert({
       rep: s.rep,
       store: s.dealer ?? profile?.store_name ?? "unknown",
@@ -121,9 +122,9 @@ export default function Enhancers({ session }: { session: Session }) {
       store_id: s.store_id,
       month: monthISO,
       category: "enhancer",
-      amount,
-      pct: null,
-      rate_pct: s.flat_amount != null ? null : s.pct,
+      amount: isFlat ? amount : null,
+      pct: isFlat ? null : s.pct,
+      rate_pct: isFlat ? null : s.pct,
       note,
       rule_id: s.rule_id,
     });
@@ -312,7 +313,7 @@ export default function Enhancers({ session }: { session: Session }) {
           </Collapsible>
         )}
         <Collapsible title="Pending approvals" count={loading ? "checking…" : `${pending.length} qualified, unpaid`}>
-          {pending.length === 0 ? <div className="tablewrap"><div className="empty">{loading ? "Checking qualification…" : "No newly qualified enhancer payouts."}</div></div> : <div className="pend-list">{pending.map((s) => <div className="pend-card" key={`${s.rule_id}|${s.rep}`}><div className="pend-main"><span className="name">{s.rep}</span><span className="rule"><span className="badge cat-enhancer">{s.brand}</span> {s.label}</span><span className="why num">{units(s.metric_value)}/{units(s.threshold)} {METRIC_LABEL[s.metric].toLowerCase()} ✓ · {s.flat_amount != null ? `${moneyExact(s.flat_amount)} × ${units(s.metric_value)} = ${moneyExact(s.proposed_amount)}` : `${s.pct}% × ${money(s.brand_front_gross)}`}</span></div>{canEdit && <button className="btn-approve" onClick={() => approve(s)}>Approve {moneyExact(s.proposed_amount)}</button>}</div>)}</div>}
+          {pending.length === 0 ? <div className="tablewrap"><div className="empty">{loading ? "Checking qualification…" : "No newly qualified enhancer payouts."}</div></div> : <div className="pend-list">{pending.map((s) => <div className="pend-card" key={`${s.rule_id}|${s.rep}`}><div className="pend-main"><span className="name">{s.rep}</span><span className="rule"><span className="badge cat-enhancer">{s.brand}</span> {s.label}</span><span className="why num">{units(s.metric_value)}/{units(s.threshold)} {METRIC_LABEL[s.metric].toLowerCase()} ✓ · {s.flat_amount != null ? `${moneyExact(s.flat_amount)} × ${units(s.metric_value)} = ${moneyExact(s.proposed_amount)}` : `${s.pct}% × ${money(s.total_commissionable_gross)} total gross`}</span></div>{canEdit && <button className="btn-approve" onClick={() => approve(s)}>Approve {moneyExact(s.proposed_amount)}</button>}</div>)}</div>}
         </Collapsible>
       </main>
     </>
