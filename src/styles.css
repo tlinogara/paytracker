@@ -31,7 +31,7 @@ button, input, select, textarea { font-family: inherit; }
 .topbar-user .who { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
 .btn-ghost { background: none; border: 1px solid rgba(247, 246, 242, 0.35); color: var(--paper); border-radius: 4px; padding: 5px 12px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; text-decoration: none; }
 .btn-ghost:hover { border-color: var(--paper); }
-.page { max-width: 1280px; margin: 0 auto; padding: 28px 24px 80px; }
+.page { max-width: 1680px; margin: 0 auto; padding: 24px 18px 80px; }
 
 .monthbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 .month-nav { display: flex; align-items: center; gap: 4px; }
@@ -76,9 +76,9 @@ button, input, select, textarea { font-family: inherit; }
 
 .tablewrap { background: var(--card); border: 1px solid var(--line); border-radius: 4px; overflow-x: auto; }
 .padbox { padding: 14px; }
-table.deals { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 760px; }
-table.deals th { font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--ink); white-space: nowrap; }
-table.deals td { padding: 9px 12px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+table.deals { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 760px; }
+table.deals th { font-family: var(--display); font-weight: 600; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--ink); white-space: nowrap; }
+table.deals td { padding: 8px 10px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
 table.deals tr:last-child td { border-bottom: none; }
 table.deals th.r, table.deals td.r { text-align: right; }
 td.money { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -87,6 +87,15 @@ td.money.neg { color: var(--red); }
 td .deal-no { font-family: var(--mono); font-size: 12px; color: var(--muted); }
 td .veh { color: var(--muted); font-size: 12.5px; }
 td.note-cell { color: var(--ink-soft); font-size: 13px; max-width: 360px; }
+.deals-wrap { width: 100%; }
+table.deals-main { font-size: 12.25px; min-width: 1120px; }
+table.deals-main th, table.deals-main td { padding: 7px 6px; }
+table.deals-main th button.sort { padding: 8px 6px; font-size: 10px; letter-spacing: 0.08em; }
+table.deals-main .cust-col { min-width: 170px; max-width: 280px; }
+table.deals-main .rep-col { max-width: 130px; }
+table.deals-main .brand-col { max-width: 120px; }
+table.deals-main .date-col { width: 86px; }
+table.deals-main .split-col { width: 54px; }
 
 .badge { display: inline-block; font-family: var(--display); font-weight: 600; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; border-radius: 3px; padding: 2px 6px; white-space: nowrap; }
 .badge.split, .badge.cat-enhancer { background: var(--amber-soft); color: var(--amber); }
@@ -127,7 +136,8 @@ td.note-cell { color: var(--ink-soft); font-size: 13px; max-width: 360px; }
 .adj-form .field { margin-bottom: 0; }
 .field.grow { min-width: 0; }
 .stock-form { grid-template-columns: 1fr auto auto; }
-@media (max-width: 1000px) { .adj-form, .stock-form { grid-template-columns: 1fr 1fr; } .adj-form .field.grow, .adj-form .btn-primary.slim { grid-column: 1 / -1; } }
+.buy-fee-form { grid-template-columns: 1fr 1fr 1fr auto; }
+@media (max-width: 1000px) { .adj-form, .stock-form, .buy-fee-form { grid-template-columns: 1fr 1fr; } .adj-form .field.grow, .adj-form .btn-primary.slim, .buy-fee-form .btn-primary.slim { grid-column: 1 / -1; } }
 
 .brand-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .fchip { font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; cursor: pointer; color: var(--ink-soft); }
@@ -140,7 +150,7 @@ td.note-cell { color: var(--ink-soft); font-size: 13px; max-width: 360px; }
 .draft-review { display: flex; flex-direction: column; gap: 10px; }
 .draft-head { font-size: 13.5px; color: var(--ink-soft); background: var(--amber-soft); border: 1px solid var(--line); border-left: 3px solid var(--amber); border-radius: 0 4px 4px 0; padding: 10px 14px; }
 table.adj tr.flagged { background: var(--amber-soft); }
-table.adj input.mini { width: 64px; text-align: right; font-family: var(--mono); }
+table.adj input.mini { width: 76px; text-align: right; font-family: var(--mono); }
 table.adj input.desc { min-width: 220px; }
 .draft-actions { display: flex; gap: 10px; align-items: center; }
 .pend-list { display: flex; flex-direction: column; gap: 6px; }
@@ -151,7 +161,7 @@ table.adj input.desc { min-width: 220px; }
 .pend-card .why { font-size: 12px; color: var(--muted); }
 
 table.deals th.sth { padding: 0; }
-table.deals th button.sort { display: flex; align-items: center; gap: 5px; width: 100%; background: none; border: none; cursor: pointer; padding: 10px 12px; font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+table.deals th button.sort { display: flex; align-items: center; gap: 5px; width: 100%; background: none; border: none; cursor: pointer; padding: 8px 10px; font-family: var(--display); font-weight: 600; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
 table.deals th.r button.sort { justify-content: flex-end; }
 table.deals th button.sort:hover, table.deals th button.sort.active { color: var(--ink); }
 table.deals th button.sort .arrow { font-size: 9px; opacity: 0.45; }
