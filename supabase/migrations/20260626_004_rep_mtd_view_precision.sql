@@ -1,0 +1,35 @@
+create or replace view public.rep_mtd as
+with sales_stats as (
+  select dp.employee_id, d.store_id, date_trunc('month', d.contract_date)::date as month, count(distinct d.id) as deal_rows, coalesce(sum(dp.split_pct),0::numeric) as units,
+    coalesce(sum(case when lower(coalesce(d.stock_type,'')) like '%new%' then dp.split_pct else 0::numeric end),0::numeric) as new_units,
+    coalesce(sum(case when lower(coalesce(d.stock_type,'')) not like '%new%' and coalesce(d.make,'')<>'' then dp.split_pct else 0::numeric end),0::numeric) as used_units,
+    coalesce(sum(coalesce(d.front_gross,0::numeric)*dp.split_pct),0::numeric) as front_gross_share,
+    coalesce(sum(case when exists(select 1 from public.deal_participants x where x.deal_id=d.id and x.employee_id is distinct from dp.employee_id) then 1 else 0 end),0::bigint) as split_deals
+  from public.sales_deals d
+  join public.deal_participants dp on dp.deal_id=d.id
+  where coalesce(d.make,'')<>'' and coalesce(d.stock_number,'')<>'' and dp.employee_id is not null
+  group by dp.employee_id, d.store_id, date_trunc('month', d.contract_date)::date
+), line_run_candidates as (
+  select cl.run_id, cl.employee_id, coalesce(cr.store_id, e.store_id) as store_id, cr.store_id as run_store_id, cr.month, cr.status, cr.refreshed_at, cr.created_at, cr.id as current_sort_id, cl.amount
+  from public.commission_runs cr
+  join public.commission_lines cl on cl.run_id=cr.id
+  left join public.employees e on e.id=cl.employee_id
+  where cr.status=any(array['preview'::text,'locked'::text,'paid'::text]) and cl.employee_id is not null
+), current_employee_runs as (
+  select distinct on (month, store_id, employee_id) run_id, month, store_id, employee_id
+  from line_run_candidates
+  order by month, store_id, employee_id, case when run_store_id is not null then 0 else 1 end, case status when 'locked' then 0 when 'paid' then 1 else 2 end, refreshed_at desc nulls last, created_at desc, current_sort_id desc
+), commission_totals as (
+  select c.employee_id, c.store_id, c.month, coalesce(sum(c.amount),0::numeric) as total_commission
+  from line_run_candidates c
+  join current_employee_runs r on r.run_id=c.run_id and r.month=c.month and not r.store_id is distinct from c.store_id and r.employee_id=c.employee_id
+  group by c.employee_id, c.store_id, c.month
+), combined as (
+  select coalesce(s.employee_id,c.employee_id) as employee_id, coalesce(s.store_id,c.store_id) as store_id, coalesce(s.month,c.month) as month, coalesce(s.deal_rows,0::bigint) as deal_rows, coalesce(s.units,0::numeric) as units, coalesce(s.new_units,0::numeric) as new_units, coalesce(s.used_units,0::numeric) as used_units, coalesce(s.front_gross_share,0::numeric) as front_gross_share, coalesce(c.total_commission,0::numeric) as total_commission, coalesce(s.split_deals,0::bigint) as split_deals
+  from sales_stats s
+  full join commission_totals c on c.employee_id=s.employee_id and c.month=s.month and not c.store_id is distinct from s.store_id
+)
+select e.id employee_id, coalesce(combined.store_id,e.store_id) store_id, e.display_name rep, st.name dealer, combined.month, combined.deal_rows, combined.units, combined.new_units, combined.used_units, combined.front_gross_share, combined.total_commission, combined.split_deals
+from combined
+join public.employees e on e.id=combined.employee_id
+left join public.stores st on st.id=coalesce(combined.store_id,e.store_id);
