@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { DealRow } from "../lib/types";
-import { isNewStock, moneyExact, money, shortDate, units } from "../lib/format";
+import { isNewStock, moneyExact, shortDate, units } from "../lib/format";
 
 type SortKey =
   | "date"
@@ -102,24 +102,24 @@ export default function DealsTable({ deals, showRep }: { deals: DealRow[]; showR
   }
 
   return (
-    <div className="tablewrap">
-      <table className="deals">
+    <div className="tablewrap deals-wrap">
+      <table className="deals deals-main">
         <thead>
           <tr>
             <Th label="Date" k="date" sort={sort} onSort={onSort} />
             <Th label="Deal" k="deal" sort={sort} onSort={onSort} />
-            <Th label="Stock #" k="stock" sort={sort} onSort={onSort} />
+            <Th label="Stock" k="stock" sort={sort} onSort={onSort} />
             {showRep && <Th label="Rep" k="rep" sort={sort} onSort={onSort} />}
             <Th label="Customer / vehicle" k="customer" sort={sort} onSort={onSort} />
             <Th label="Brand" k="make" sort={sort} onSort={onSort} />
-            <Th label="N / U / A" k="nu" sort={sort} onSort={onSort} />
+            <Th label="Type" k="nu" sort={sort} onSort={onSort} />
             <Th label="Unit" k="unit" sort={sort} onSort={onSort} right />
-            <Th label="Front gross" k="front" sort={sort} onSort={onSort} right />
-            <Th label="Spiffs" k="spiffs" sort={sort} onSort={onSort} right />
-            <Th label="Enhancers" k="enhancers" sort={sort} onSort={onSort} right />
-            <Th label="Trade spiffs" k="trade_spiffs" sort={sort} onSort={onSort} right />
-            <Th label="Commission" k="comm" sort={sort} onSort={onSort} right />
-            <th></th>
+            <Th label="Front" k="front" sort={sort} onSort={onSort} right />
+            <Th label="Spiff" k="spiffs" sort={sort} onSort={onSort} right />
+            <Th label="Enh" k="enhancers" sort={sort} onSort={onSort} right />
+            <Th label="Trade" k="trade_spiffs" sort={sort} onSort={onSort} right />
+            <Th label="Comm" k="comm" sort={sort} onSort={onSort} right />
+            <th className="split-col"></th>
           </tr>
         </thead>
         <tbody>
@@ -132,16 +132,16 @@ export default function DealsTable({ deals, showRep }: { deals: DealRow[]; showR
             const fg = d.front_gross;
             return (
               <tr key={`${d.deal_number}-${d.stock_number ?? "no-stock"}-${d.rep}`}>
-                <td className="num">{shortDate(d.contract_date)}</td>
+                <td className="num date-col">{shortDate(d.contract_date)}</td>
                 <td><span className="deal-no">#{d.deal_number}</span></td>
                 <td><span className="deal-no">{d.stock_number || "—"}</span></td>
-                {showRep && <td>{d.rep || "—"}</td>}
-                <td>
+                {showRep && <td className="rep-col">{d.rep || "—"}</td>}
+                <td className="cust-col">
                   {d.customer || "—"}
                   <br />
                   <span className="veh">{d.vehicle || ""}</span>
                 </td>
-                <td>{d.make?.trim() || "—"}</td>
+                <td className="brand-col">{d.make?.trim() || "—"}</td>
                 <td>
                   {!d.make || !d.make.trim() ? (
                     <span className="badge acq">Acq</span>
@@ -152,7 +152,7 @@ export default function DealsTable({ deals, showRep }: { deals: DealRow[]; showR
                   )}
                 </td>
                 <td className="r num">{units(d.rep_unit_count)}</td>
-                <td className={`r money ${fg != null && fg < 0 ? "neg" : ""}`}>{money(fg)}</td>
+                <td className={`r money ${fg != null && fg < 0 ? "neg" : ""}`}>{moneyExact(fg)}</td>
                 <td className={`r money ${spiffs < 0 ? "neg" : spiffs > 0 ? "pos" : ""}`}>{moneyExact(spiffs)}</td>
                 <td className={`r money ${enhancers < 0 ? "neg" : enhancers > 0 ? "pos" : ""}`}>{moneyExact(enhancers)}</td>
                 <td className={`r money ${tradeSpiffs < 0 ? "neg" : tradeSpiffs > 0 ? "pos" : ""}`}>{moneyExact(tradeSpiffs)}</td>
