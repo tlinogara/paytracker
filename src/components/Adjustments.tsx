@@ -48,6 +48,14 @@ export default function Adjustments({
     return Math.round(((a.pct / 100) * (fgsByRep.get(a.rep) ?? 0)) * 100) / 100;
   }
 
+  async function refreshPreview(storeId: string | null | undefined) {
+    const { error } = await supabase.rpc("refresh_commission_preview", {
+      p_month: monthISO,
+      p_store_id: storeId ?? null,
+    });
+    if (error) throw error;
+  }
+
   async function add(e: FormEvent) {
     e.preventDefault();
     setErr(null);
@@ -81,11 +89,19 @@ export default function Adjustments({
       pct: p,
       note: note.trim() || null,
     });
-    setBusy(false);
     if (error) {
+      setBusy(false);
       setErr(error.message);
       return;
     }
+    try {
+      await refreshPreview(repRow?.store_id ?? null);
+    } catch (refreshError) {
+      setBusy(false);
+      setErr(refreshError instanceof Error ? refreshError.message : "The adjustment saved, but commission refresh failed.");
+      return;
+    }
+    setBusy(false);
     setAmount("");
     setPct("");
     setDealNumber("");
@@ -93,10 +109,19 @@ export default function Adjustments({
     onChanged();
   }
 
-  async function remove(id: string) {
-    const { error } = await supabase.from("adjustments").delete().eq("id", id);
-    if (error) setErr(error.message);
-    else onChanged();
+  async function remove(a: Adjustment) {
+    setErr(null);
+    const { error } = await supabase.from("adjustments").delete().eq("id", a.id);
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+    try {
+      await refreshPreview(a.store_id ?? null);
+      onChanged();
+    } catch (refreshError) {
+      setErr(refreshError instanceof Error ? refreshError.message : "The entry was removed, but commission refresh failed.");
+    }
   }
 
   return (
@@ -121,19 +146,22 @@ export default function Adjustments({
               </tr>
             </thead>
             <tbody>
-              {entries.map((a) => (
-                <tr key={a.id}>
-                  <td>{a.rep}</td>
-                  <td><span className={`badge cat-${a.category}`}>{CATEGORY_LABEL[a.category] ?? a.category}</span></td>
-                  <td className="r money pos">
-                    {a.pct != null ? <>{a.pct}% <span className="deal-no">≈ {moneyExact(enhancerDollars(a))}</span></> : moneyExact(a.amount)}
-                  </td>
-                  <td>{a.deal_number ? <span className="deal-no">#{a.deal_number}</span> : "—"}</td>
-                  <td className="note-cell">{a.note || "—"}</td>
-                  <td className="num">{shortDate(a.created_at.slice(0, 10))}</td>
-                  {canEdit && <td className="r"><button className="btn-del" onClick={() => remove(a.id)}>Remove</button></td>}
-                </tr>
-              ))}
+              {entries.map((a) => {
+                const displayAmount = a.pct != null ? enhancerDollars(a) : a.amount ?? 0;
+                return (
+                  <tr key={a.id}>
+                    <td>{a.rep}</td>
+                    <td><span className={`badge cat-${a.category}`}>{CATEGORY_LABEL[a.category] ?? a.category}</span></td>
+                    <td className={`r money ${displayAmount < 0 ? "neg" : "pos"}`}>
+                      {a.pct != null ? <>{a.pct}% <span className="deal-no">≈ {moneyExact(displayAmount)}</span></> : moneyExact(a.amount)}
+                    </td>
+                    <td>{a.deal_number ? <span className="deal-no">#{a.deal_number}</span> : "—"}</td>
+                    <td className="note-cell">{a.note || "—"}</td>
+                    <td className="num">{shortDate(a.created_at.slice(0, 10))}</td>
+                    {canEdit && <td className="r"><button className="btn-del" onClick={() => remove(a)}>Remove</button></td>}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -159,7 +187,7 @@ export default function Adjustments({
               <option value="other">Other</option>
             </select>
           </div>
-          <div className="field"><label htmlFor="adj-amt">Amount $</label><input id="adj-amt" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500" /></div>
+          <div className="field"><label htmlFor="adj-amt">Amount $</label><input id="adj-amt" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500 or -250" /></div>
           <div className="field"><label htmlFor="adj-pct">or %</label><input id="adj-pct" inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="1.25" /></div>
           <div className="field"><label htmlFor="adj-deal">Deal #</label><input id="adj-deal" value={dealNumber} onChange={(e) => setDealNumber(e.target.value)} /></div>
           <div className="field grow"><label htmlFor="adj-note">Note</label><input id="adj-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason or source" /></div>
