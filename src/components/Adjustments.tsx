@@ -4,9 +4,12 @@ import { supabase } from "../lib/supabase";
 import type { Adjustment, AdjCategory, RepMtd } from "../lib/types";
 import { moneyExact, shortDate } from "../lib/format";
 
-const CATEGORY_LABEL: Record<AdjCategory, string> = {
+const CATEGORY_LABEL: Record<string, string> = {
   spiff: "Spiff",
   enhancer: "Enhancer",
+  enhanced_mini: "Enhanced Mini",
+  trade_spiff: "Trade Spiff",
+  buy_fee: "Buy Fee",
   correction: "Correction",
   other: "Other",
 };
@@ -31,7 +34,7 @@ export default function Adjustments({
   onChanged: () => void;
 }) {
   const [rep, setRep] = useState(selectedRep ?? "");
-  const [category, setCategory] = useState<AdjCategory>("spiff");
+  const [category, setCategory] = useState("spiff");
   const [amount, setAmount] = useState("");
   const [pct, setPct] = useState("");
   const [dealNumber, setDealNumber] = useState("");
@@ -121,7 +124,7 @@ export default function Adjustments({
               {entries.map((a) => (
                 <tr key={a.id}>
                   <td>{a.rep}</td>
-                  <td><span className={`badge cat-${a.category}`}>{CATEGORY_LABEL[a.category]}</span></td>
+                  <td><span className={`badge cat-${a.category}`}>{CATEGORY_LABEL[a.category] ?? a.category}</span></td>
                   <td className="r money pos">
                     {a.pct != null ? <>{a.pct}% <span className="deal-no">≈ {moneyExact(enhancerDollars(a))}</span></> : moneyExact(a.amount)}
                   </td>
@@ -146,14 +149,17 @@ export default function Adjustments({
           </div>
           <div className="field">
             <label htmlFor="adj-cat">Type</label>
-            <select id="adj-cat" value={category} onChange={(e) => setCategory(e.target.value as AdjCategory)}>
+            <select id="adj-cat" value={category} onChange={(e) => setCategory(e.target.value)}>
               <option value="spiff">Spiff</option>
               <option value="enhancer">Enhancer</option>
+              <option value="enhanced_mini">Enhanced Mini</option>
+              <option value="trade_spiff">Trade Spiff</option>
+              <option value="buy_fee">Buy Fee</option>
               <option value="correction">Correction</option>
               <option value="other">Other</option>
             </select>
           </div>
-          <div className="field"><label htmlFor="adj-amt">Amount $</label><input id="adj-amt" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500 or -150" /></div>
+          <div className="field"><label htmlFor="adj-amt">Amount $</label><input id="adj-amt" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500" /></div>
           <div className="field"><label htmlFor="adj-pct">or %</label><input id="adj-pct" inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="1.25" /></div>
           <div className="field"><label htmlFor="adj-deal">Deal #</label><input id="adj-deal" value={dealNumber} onChange={(e) => setDealNumber(e.target.value)} /></div>
           <div className="field grow"><label htmlFor="adj-note">Note</label><input id="adj-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason or source" /></div>
