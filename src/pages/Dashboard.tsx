@@ -223,23 +223,26 @@ export default function Dashboard({ session }: { session: Session }) {
         )}
         <MonthBar month={month} isCurrentMonth={isCurrentMonth} setMonth={setMonth} />
         {selectedRep && <button className="btn-step wide" onClick={() => setSelectedRep(null)}>Clear filter: {selectedRep}</button>}
-        <section className="sticker" aria-label="Month summary">
-          <div className="sticker-head">
-            <span className="sticker-title">{isCurrentMonth ? "Month to date" : monthLabel(month)}</span>
-            <span className="sticker-sub">{scopeLabel}{profile?.store_name ? ` · ${profile.store_name}` : ""} · server calculated</span>
-          </div>
-          <div className="sticker-body">
-            <div className="cell hero"><div className="k">Commission</div><div className="v">{moneyExact(scoped.commission)}</div></div>
-            <div className="cell"><div className="k">Units</div><div className="v">{units(scoped.units)}</div></div>
-            <div className="cell"><div className="k">New</div><div className="v">{units(scoped.newUnits)}</div></div>
-            <div className="cell"><div className="k">Used</div><div className="v">{units(scoped.usedUnits)}</div></div>
-            <div className="cell"><div className="k">Acq</div><div className="v">{units(acqUnits)}</div></div>
-            <div className="cell"><div className="k">Front gross</div><div className="v">{money(scoped.frontGross)}<small>unit weighted</small></div></div>
-          </div>
-        </section>
+
+        <Collapsible title={isCurrentMonth ? "Month to date" : monthLabel(month)} count={scopeLabel}>
+          <section className="sticker" aria-label="Month summary">
+            <div className="sticker-head">
+              <span className="sticker-title">{isCurrentMonth ? "Month to date" : monthLabel(month)}</span>
+              <span className="sticker-sub">{scopeLabel}{profile?.store_name ? ` · ${profile.store_name}` : ""} · server calculated</span>
+            </div>
+            <div className="sticker-body">
+              <div className="cell hero"><div className="k">Commission</div><div className="v">{moneyExact(scoped.commission)}</div></div>
+              <div className="cell"><div className="k">Units</div><div className="v">{units(scoped.units)}</div></div>
+              <div className="cell"><div className="k">New</div><div className="v">{units(scoped.newUnits)}</div></div>
+              <div className="cell"><div className="k">Used</div><div className="v">{units(scoped.usedUnits)}</div></div>
+              <div className="cell"><div className="k">Acq</div><div className="v">{units(acqUnits)}</div></div>
+              <div className="cell"><div className="k">Front gross</div><div className="v">{money(scoped.frontGross)}<small>unit weighted</small></div></div>
+            </div>
+          </section>
+        </Collapsible>
+
         {isManagerView && repRows.length > 0 && (
-          <>
-            <div className="section-head"><h2>Salespeople</h2><span className="count">tap a salesperson to filter</span></div>
+          <Collapsible title="Salespeople" count="tap a salesperson to filter">
             <div className="team-grid">
               {(showAllReps ? repRows : repRows.slice(0, 8)).map((r) => (
                 <button key={r.rep} className={`team-card ${selectedRep === r.rep ? "active" : ""}`} onClick={() => setSelectedRep(selectedRep === r.rep ? null : r.rep)}>
@@ -249,15 +252,19 @@ export default function Dashboard({ session }: { session: Session }) {
               ))}
             </div>
             {repRows.length > 8 && <button className="btn-showall" onClick={() => setShowAllReps((v) => !v)}>{showAllReps ? "Show fewer" : `Show all ${repRows.length} salespeople`}</button>}
-          </>
+          </Collapsible>
         )}
-        <div className="section-head"><h2>Deals</h2><span className="count">{loading ? "loading…" : `${deals.length} row(s)`}</span></div>
-        {loading ? <div className="tablewrap"><div className="loading">Loading deals…</div></div> : <DealsTable deals={deals} showRep={isManagerView && !selectedRep} />}
+
+        <Collapsible title="Deals" count={loading ? "loading…" : `${deals.length} row(s)`}>
+          {loading ? <div className="tablewrap"><div className="loading">Loading deals…</div></div> : <DealsTable deals={deals} showRep={isManagerView && !selectedRep} />}
+        </Collapsible>
+
         {(isManagerView || adjustments.length > 0) && (
           <Collapsible title="Spiffs and adjustments" count={isManagerView ? "manager entered inputs" : "entered by management"} defaultOpen={false}>
             <Adjustments key={`${monthStartISO(month)}-${selectedRep ?? "all"}`} entries={adjustments} canEdit={isManagerView} monthISO={monthStartISO(month)} reps={repRows} fgsByRep={fgsByRep} defaultStore={formStore} selectedRep={selectedRep} onChanged={loadData} />
           </Collapsible>
         )}
+
         <Collapsible title="Commission line audit" count={`${lines.length} line(s)`} defaultOpen={false}>
           <div className="tablewrap">
             <table className="deals adj">

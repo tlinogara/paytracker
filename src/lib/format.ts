@@ -10,6 +10,16 @@ const usdCents = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
 });
 
+const pacificDateTime = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Los_Angeles",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZoneName: "short",
+});
+
 export function money(n: number | null | undefined): string {
   if (n == null) return "—";
   return usd.format(n);
@@ -43,6 +53,13 @@ export function shortDate(iso: string | null): string {
   const [y, m, day] = iso.split("-").map(Number);
   if (!y || !m || !day) return iso;
   return `${String(m).padStart(2, "0")}/${String(day).padStart(2, "0")}/${y}`;
+}
+
+export function formatPacificDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return pacificDateTime.format(date);
 }
 
 export function isNewStock(stockType: string | null): boolean | null {

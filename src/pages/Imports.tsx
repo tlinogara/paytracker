@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import type { ImportFile, Profile } from "../lib/types";
 import { parseCsv, sha256 } from "../lib/csv";
 import Topbar from "../components/Topbar";
+import Collapsible from "../components/Collapsible";
 import { shortDate } from "../lib/format";
 
 type CsvRow = Record<string, string>;
@@ -180,59 +181,61 @@ export default function Imports({ session }: { session: Session }) {
     <>
       <Topbar profile={profile} />
       <main className="page">
-        <div className="section-head">
-          <h2>Tekion imports</h2>
-          <span className="count">raw file staging</span>
-        </div>
         {err && <div className="notice">{err}</div>}
         {ok && <div className="form-msg ok">{ok}</div>}
         {!canImport && profile && (
           <div className="notice">Only payroll and admins can import Tekion files.</div>
         )}
-        {canImport && (
-          <section className="tablewrap padbox">
-            <div className="field">
-              <label htmlFor="csv">Tekion deal sales log CSV</label>
-              <input
-                id="csv"
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              />
+
+        <Collapsible title="Tekion imports" count="raw file staging">
+          {canImport ? (
+            <section className="tablewrap padbox">
+              <div className="field">
+                <label htmlFor="csv">Tekion deal sales log CSV</label>
+                <input
+                  id="csv"
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+              <button className="btn-primary slim" disabled={!file || busy} onClick={upload}>
+                {busy ? "Importing…" : "Upload and process"}
+              </button>
+            </section>
+          ) : (
+            <div className="tablewrap">
+              <div className="empty">No import actions are available for this role.</div>
             </div>
-            <button className="btn-primary slim" disabled={!file || busy} onClick={upload}>
-              {busy ? "Importing…" : "Upload and process"}
-            </button>
-          </section>
-        )}
-        <div className="section-head">
-          <h2>Recent imports</h2>
-          <span className="count">{imports.length} file(s)</span>
-        </div>
-        <div className="tablewrap">
-          <table className="deals adj">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>File</th>
-                <th>Source</th>
-                <th className="r">Rows</th>
-                <th>Hash</th>
-              </tr>
-            </thead>
-            <tbody>
-              {imports.map((f) => (
-                <tr key={f.id}>
-                  <td className="num">{shortDate(f.imported_at.slice(0, 10))}</td>
-                  <td>{f.file_name}</td>
-                  <td>{f.source}</td>
-                  <td className="r num">{f.row_count ?? 0}</td>
-                  <td className="note-cell">{f.file_hash?.slice(0, 16) ?? "—"}</td>
+          )}
+        </Collapsible>
+
+        <Collapsible title="Recent imports" count={`${imports.length} file(s)`}>
+          <div className="tablewrap">
+            <table className="deals adj">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>File</th>
+                  <th>Source</th>
+                  <th className="r">Rows</th>
+                  <th>Hash</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {imports.map((f) => (
+                  <tr key={f.id}>
+                    <td className="num">{shortDate(f.imported_at.slice(0, 10))}</td>
+                    <td>{f.file_name}</td>
+                    <td>{f.source}</td>
+                    <td className="r num">{f.row_count ?? 0}</td>
+                    <td className="note-cell">{f.file_hash?.slice(0, 16) ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Collapsible>
       </main>
     </>
   );

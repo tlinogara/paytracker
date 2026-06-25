@@ -165,3 +165,22 @@ table.deals th button.sort.active .arrow { opacity: 1; color: var(--green); }
   .cell:nth-child(even) { border-right: 1px solid var(--hairline); }
   .cell:last-child { border-bottom: none; border-right: none; }
 }
+
+/* ---------- Collapsible section action rows ---------- */
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 14px;
+}
+
+.action-cell {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  white-space: nowrap;
+}
