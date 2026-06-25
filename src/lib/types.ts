@@ -48,13 +48,25 @@ export interface DealRow {
   rep_unit_count: number | null;
   rep_commission: number | null;
   spiffs: number | null;
+  total_enhancers: number | null;
+  trade_spiffs: number | null;
   is_split_deal: boolean | null;
   salesperson: string | null;
   dealer: string | null;
   make: string | null;
 }
 
-export type AdjCategory = "spiff" | "enhancer" | "correction" | "other";
+export type AdjCategory =
+  | "spiff"
+  | "enhancer"
+  | "enhanced_mini"
+  | "trade_spiff"
+  | "buy_fee"
+  | "correction"
+  | "draw"
+  | "prior_month"
+  | "carryover"
+  | "other";
 
 export interface Adjustment {
   id: string;
@@ -113,6 +125,7 @@ export interface EnhancerStatus {
   brand_front_gross: number | null;
   qualified: boolean;
   proposed_amount: number | null;
+  total_commissionable_gross: number | null;
 }
 
 export interface CommissionLine {
