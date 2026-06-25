@@ -13,6 +13,8 @@ type SortKey =
   | "unit"
   | "front"
   | "spiffs"
+  | "enhancers"
+  | "trade_spiffs"
   | "comm";
 
 type Dir = "asc" | "desc";
@@ -31,6 +33,8 @@ const ACCESSORS: Record<SortKey, (d: DealRow) => string | number | null> = {
   unit: (d) => d.rep_unit_count,
   front: (d) => d.front_gross,
   spiffs: (d) => d.spiffs,
+  enhancers: (d) => d.total_enhancers,
+  trade_spiffs: (d) => d.trade_spiffs,
   comm: (d) => d.rep_commission,
 };
 
@@ -40,6 +44,10 @@ function compare(a: string | number | null, b: string | number | null): number {
   if (b == null) return -1;
   if (typeof a === "number" && typeof b === "number") return a - b;
   return String(a).localeCompare(String(b));
+}
+
+function isMoneySort(k: SortKey): boolean {
+  return k === "unit" || k === "front" || k === "spiffs" || k === "enhancers" || k === "trade_spiffs" || k === "comm" || k === "date";
 }
 
 function Th({
@@ -73,7 +81,7 @@ export default function DealsTable({ deals, showRep }: { deals: DealRow[]; showR
     setSort((s) =>
       s.key === k
         ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" }
-        : { key: k, dir: k === "unit" || k === "front" || k === "spiffs" || k === "comm" || k === "date" ? "desc" : "asc" }
+        : { key: k, dir: isMoneySort(k) ? "desc" : "asc" }
     );
   }
 
@@ -108,6 +116,8 @@ export default function DealsTable({ deals, showRep }: { deals: DealRow[]; showR
             <Th label="Unit" k="unit" sort={sort} onSort={onSort} right />
             <Th label="Front gross" k="front" sort={sort} onSort={onSort} right />
             <Th label="Spiffs" k="spiffs" sort={sort} onSort={onSort} right />
+            <Th label="Enhancers" k="enhancers" sort={sort} onSort={onSort} right />
+            <Th label="Trade spiffs" k="trade_spiffs" sort={sort} onSort={onSort} right />
             <Th label="Commission" k="comm" sort={sort} onSort={onSort} right />
             <th></th>
           </tr>
@@ -117,6 +127,8 @@ export default function DealsTable({ deals, showRep }: { deals: DealRow[]; showR
             const isNew = isNewStock(d.stock_type);
             const comm = d.rep_commission ?? 0;
             const spiffs = d.spiffs ?? 0;
+            const enhancers = d.total_enhancers ?? 0;
+            const tradeSpiffs = d.trade_spiffs ?? 0;
             const fg = d.front_gross;
             return (
               <tr key={`${d.deal_number}-${d.stock_number ?? "no-stock"}-${d.rep}`}>
@@ -142,6 +154,8 @@ export default function DealsTable({ deals, showRep }: { deals: DealRow[]; showR
                 <td className="r num">{units(d.rep_unit_count)}</td>
                 <td className={`r money ${fg != null && fg < 0 ? "neg" : ""}`}>{money(fg)}</td>
                 <td className={`r money ${spiffs < 0 ? "neg" : spiffs > 0 ? "pos" : ""}`}>{moneyExact(spiffs)}</td>
+                <td className={`r money ${enhancers < 0 ? "neg" : enhancers > 0 ? "pos" : ""}`}>{moneyExact(enhancers)}</td>
+                <td className={`r money ${tradeSpiffs < 0 ? "neg" : tradeSpiffs > 0 ? "pos" : ""}`}>{moneyExact(tradeSpiffs)}</td>
                 <td className={`r money ${comm < 0 ? "neg" : "pos"}`}>{moneyExact(comm)}</td>
                 <td>{d.is_split_deal && <span className="badge split" title={d.salesperson ?? ""}>Split</span>}</td>
               </tr>
