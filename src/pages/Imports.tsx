@@ -15,45 +15,33 @@ function cleanCell(value: string | undefined): string | null {
   return trimmed;
 }
 
-function parseTekionDate(value: string | undefined): Date | null {
-  const raw = cleanCell(value);
+function parseTekionMonthISO(row: CsvRow): string | null {
+  const raw = cleanCell(row["Contract Date"]) ?? cleanCell(row["Final accounting date"]) ?? cleanCell(row["Delivery Promised Date"]);
   if (!raw) return null;
-
   const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(raw);
   if (!match) return null;
-
   const month = Number(match[1]);
   const day = Number(match[2]);
   const year = Number(match[3]);
   if (month < 1 || month > 12 || day < 1 || day > 31 || year < 2000) return null;
-
-  return new Date(year, month - 1, 1);
-}
-
-function monthStartISO(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+  return `${year}-${String(month).padStart(2, "0")}-01`;
 }
 
 function detectImportMonths(rows: CsvRow[]): string[] {
   const months = new Set<string>();
-
   for (const row of rows) {
     const dealNumber = cleanCell(row["Deal Number"]);
     if (!dealNumber) continue;
-
-    const contractDate = parseTekionDate(row["Contract Date"]);
-    if (contractDate) months.add(monthStartISO(contractDate));
+    const monthISO = parseTekionMonthISO(row);
+    if (monthISO) months.add(monthISO);
   }
-
   return Array.from(months).sort();
 }
 
 function monthLabelFromISO(iso: string): string {
   const [year, month] = iso.split("-").map(Number);
-  return new Date(year, month - 1, 1).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
+  const names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  return `${names[month - 1] ?? iso} ${year}`;
 }
 
 export default function Imports({ session }: { session: Session }) {
@@ -90,7 +78,7 @@ export default function Imports({ session }: { session: Session }) {
 
   async function refreshMonths(months: string[]) {
     if (months.length === 0) {
-      throw new Error("No valid Contract Date values were found, so no commission month could be refreshed.");
+      throw new Error("No valid Tekion date values were found, so no commission month could be refreshed.");
     }
 
     for (const month of months) {
@@ -191,7 +179,7 @@ export default function Imports({ session }: { session: Session }) {
           {canImport ? (
             <section className="tablewrap padbox">
               <div className="field">
-                <label htmlFor="csv">Tekion deal sales log CSV</label>
+                <label htmlFor="csv">Tekion deal sales log CSV, dated or undated</label>
                 <input
                   id="csv"
                   type="file"
