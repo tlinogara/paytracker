@@ -4,6 +4,7 @@ import App from "./App";
 import "./styles.css";
 import "./enhancer-layout.css";
 import "./commission-audit-sort";
+import "./manual-enhancer-review";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
