@@ -3,7 +3,6 @@ import { useState, type ReactNode } from "react";
 export default function Collapsible({
   title,
   count,
-  defaultOpen = true,
   children,
 }: {
   title: ReactNode;
@@ -11,7 +10,7 @@ export default function Collapsible({
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(true);
   return (
     <section className="collapsible">
       <button className="section-head section-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
