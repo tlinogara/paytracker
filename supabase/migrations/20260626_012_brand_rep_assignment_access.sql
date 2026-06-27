@@ -1,0 +1,1 @@
+create policy brand_rep_assignments_manager_access on public.brand_rep_assignments to authenticated using (public.is_admin_or_payroll() or store_id = public.current_store_id()) with check (public.is_admin_or_payroll() or store_id = public.current_store_id());
