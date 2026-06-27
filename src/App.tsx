@@ -5,6 +5,7 @@ import { configured, supabase } from "./lib/supabase";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Enhancers from "./pages/Enhancers";
+import BrandReps from "./pages/BrandReps";
 import Imports from "./pages/Imports";
 import Payroll from "./pages/Payroll";
 import Calculations from "./pages/Calculations";
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/login" element={session ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/update-password" element={session ? <UpdatePassword /> : <Navigate to="/login" replace />} />
         <Route path="/enhancers" element={session ? <Enhancers session={session} /> : <Navigate to="/login" replace />} />
+        <Route path="/brand-reps" element={session ? <BrandReps session={session} /> : <Navigate to="/login" replace />} />
         <Route path="/imports" element={session ? <Imports session={session} /> : <Navigate to="/login" replace />} />
         <Route path="/payroll" element={session ? <Payroll session={session} /> : <Navigate to="/login" replace />} />
         <Route path="/calculations" element={session ? <Calculations session={session} /> : <Navigate to="/login" replace />} />
