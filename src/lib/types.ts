@@ -17,6 +17,26 @@ export interface Profile {
   role: Role;
 }
 
+export interface Employee {
+  id: string;
+  display_name: string;
+  store_id: string | null;
+  tekion_names?: string[];
+  active: boolean;
+}
+
+export interface BrandRepAssignment {
+  id: string;
+  month: string;
+  store_id: string | null;
+  brand: string;
+  employee_id: string;
+  active: boolean;
+  note: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface RepMtd {
   employee_id: string | null;
   store_id: string | null;
