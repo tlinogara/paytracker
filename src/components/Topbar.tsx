@@ -16,36 +16,17 @@ export default function Topbar({ profile }: { profile: Profile | null }) {
         Pay<span>Track</span>
       </Link>
       <nav className="topbar-user">
-        <Link className="btn-ghost" to={monthLink("/")}>
-          Dashboard
-        </Link>
-        {canManage && (
-          <Link className="btn-ghost" to={monthLink("/enhancers")}>
-            Enhancers
-          </Link>
-        )}
-        {canAdmin && (
-          <Link className="btn-ghost" to={monthLink("/imports")}>
-            Imports
-          </Link>
-        )}
-        {canAdmin && (
-          <Link className="btn-ghost" to={monthLink("/payroll")}>
-            Payroll
-          </Link>
-        )}
-        {isAdmin && (
-          <Link className="btn-ghost" to={monthLink("/calculations")}>
-            Calculations
-          </Link>
-        )}
+        <Link className="btn-ghost" to={monthLink("/")}>Dashboard</Link>
+        {canManage && <Link className="btn-ghost" to={monthLink("/enhancers")}>Enhancers</Link>}
+        {canManage && <Link className="btn-ghost" to={monthLink("/brand-reps")}>Brands</Link>}
+        {canAdmin && <Link className="btn-ghost" to={monthLink("/imports")}>Imports</Link>}
+        {canAdmin && <Link className="btn-ghost" to={monthLink("/payroll")}>Payroll</Link>}
+        {isAdmin && <Link className="btn-ghost" to={monthLink("/calculations")}>Calculations</Link>}
         <span className="who">
           {profile?.full_name || profile?.email || "Signed in"}
           {role && role !== "rep" ? ` · ${role}` : ""}
         </span>
-        <button className="btn-ghost" onClick={() => supabase.auth.signOut()}>
-          Sign out
-        </button>
+        <button className="btn-ghost" onClick={() => supabase.auth.signOut()}>Sign out</button>
       </nav>
     </header>
   );
