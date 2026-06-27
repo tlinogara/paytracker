@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { useMonth } from "../lib/useMonth";
 import { supabase } from "../lib/supabase";
 import { parseEnhancerText } from "../lib/parseEnhancers";
 import type { DraftRule } from "../lib/parseEnhancers";
-import type { Adjustment, EnhancerMetric, EnhancerRule, EnhancerStatus, Profile } from "../lib/types";
+import type { Adjustment, BrandRepAssignment, Employee, EnhancerMetric, EnhancerRule, EnhancerStatus, Profile } from "../lib/types";
 import { moneyExact, money, monthLabel, monthStartISO, units } from "../lib/format";
 import Topbar from "../components/Topbar";
 import MonthBar from "../components/MonthBar";
@@ -45,7 +45,6 @@ type ManualEnhancerStatus = {
   employee_id: string | null;
   rep: string;
   dealer: string | null;
-  brand_front_gross: number | null;
   total_commissionable_gross: number | null;
   proposed_amount: number | null;
   approved: boolean;
@@ -77,6 +76,8 @@ export default function Enhancers({ session }: { session: Session }) {
   const [approved, setApproved] = useState<Adjustment[]>([]);
   const [stocks, setStocks] = useState<string[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [brandAssignments, setBrandAssignments] = useState<BrandRepAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
@@ -92,6 +93,8 @@ export default function Enhancers({ session }: { session: Session }) {
   const [stockPaste, setStockPaste] = useState("");
   const [pasteText, setPasteText] = useState("");
   const [drafts, setDrafts] = useState<EditDraft[] | null>(null);
+  const [assignBrand, setAssignBrand] = useState("");
+  const [assignEmployeeId, setAssignEmployeeId] = useState("");
 
   const monthISO = monthStartISO(month);
 
@@ -103,20 +106,24 @@ export default function Enhancers({ session }: { session: Session }) {
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
-    const [rulesRes, statusRes, manualRes, apprRes, stockRes] = await Promise.all([
+    const [rulesRes, statusRes, manualRes, apprRes, stockRes, assignmentRes, employeeRes] = await Promise.all([
       supabase.from("enhancer_rules").select("*").eq("month", monthISO).order("brand").order("label"),
       supabase.from("enhancer_status").select("*").eq("month", monthISO).eq("qualified", true).order("brand").order("rep"),
       supabase.from("manual_enhancer_status").select("*").eq("month", monthISO).order("brand").order("label").order("rep"),
       supabase.from("adjustments").select("*").eq("month", monthISO).not("rule_id", "is", null),
       supabase.from("priority_stock").select("stock_number").eq("month", monthISO).order("stock_number"),
+      supabase.from("brand_rep_assignments").select("*").eq("month", monthISO).eq("active", true).order("brand"),
+      supabase.from("employees").select("id,display_name,store_id,active").eq("active", true).order("display_name"),
     ]);
-    const e = rulesRes.error || statusRes.error || manualRes.error || apprRes.error || stockRes.error;
+    const e = rulesRes.error || statusRes.error || manualRes.error || apprRes.error || stockRes.error || assignmentRes.error || employeeRes.error;
     if (e) setErr(e.message);
     setRules((rulesRes.data ?? []) as EnhancerRule[]);
     setStatus((statusRes.data ?? []) as EnhancerStatus[]);
     setManualReview((manualRes.data ?? []) as ManualEnhancerStatus[]);
     setApproved((apprRes.data ?? []) as Adjustment[]);
     setStocks(((stockRes.data ?? []) as { stock_number: string }[]).map((s) => s.stock_number));
+    setBrandAssignments((assignmentRes.data ?? []) as BrandRepAssignment[]);
+    setEmployees((employeeRes.data ?? []) as Employee[]);
     setLoading(false);
   }, [monthISO]);
 
@@ -132,6 +139,31 @@ export default function Enhancers({ session }: { session: Session }) {
   const visibleRules = useMemo(() => (ruleBrand ? standardRules.filter((r) => r.brand === ruleBrand) : standardRules), [standardRules, ruleBrand]);
   const pending = status.filter((s) => !approvedKeys.has(`${s.rule_id}|${s.rep}`));
   const manualApprovedCount = manualReview.filter((r) => r.approved).length;
+  const brandOptions = useMemo(() => brands.filter((b) => b !== ALL_BRANDS), [brands]);
+  const employeeById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
+  const activeAssignments = useMemo(() => brandAssignments.filter((a) => a.active), [brandAssignments]);
+  const assignmentsByBrand = useMemo(() => {
+    const grouped = new Map<string, BrandRepAssignment[]>();
+    for (const b of brandOptions) grouped.set(b, []);
+    for (const a of activeAssignments) {
+      if (!grouped.has(a.brand)) grouped.set(a.brand, []);
+      grouped.get(a.brand)!.push(a);
+    }
+    for (const rows of grouped.values()) {
+      rows.sort((a, b) => (employeeById.get(a.employee_id)?.display_name ?? "").localeCompare(employeeById.get(b.employee_id)?.display_name ?? ""));
+    }
+    return grouped;
+  }, [activeAssignments, brandOptions, employeeById]);
+  const manualReviewGroups = useMemo(() => {
+    const rowsByBrand = new Map<string, ManualEnhancerStatus[]>();
+    for (const row of manualReview) {
+      if (!rowsByBrand.has(row.brand)) rowsByBrand.set(row.brand, []);
+      rowsByBrand.get(row.brand)!.push(row);
+    }
+    for (const rows of rowsByBrand.values()) rows.sort((a, b) => a.label.localeCompare(b.label) || a.rep.localeCompare(b.rep));
+    const manualBrands = Array.from(new Set([...manualRules.map((r) => r.brand), ...manualReview.map((r) => r.brand)])).sort();
+    return manualBrands.map((b) => [b, rowsByBrand.get(b) ?? []] as const);
+  }, [manualReview, manualRules]);
 
   async function approve(s: EnhancerStatus) {
     setErr(null);
@@ -305,6 +337,59 @@ export default function Enhancers({ session }: { session: Session }) {
     else setStocks((prev) => prev.filter((s) => s !== stockNumber));
   }
 
+  async function assignRepToBrand(e: FormEvent) {
+    e.preventDefault();
+    setErr(null);
+    setOk(null);
+    if (!assignBrand || !assignEmployeeId) {
+      setErr("Choose both a brand and a rep.");
+      return;
+    }
+    const employee = employeeById.get(assignEmployeeId);
+    if (!employee) {
+      setErr("Rep not found.");
+      return;
+    }
+    if (activeAssignments.some((a) => a.brand === assignBrand && a.employee_id === assignEmployeeId)) {
+      setErr(`${employee.display_name} is already assigned to ${assignBrand}.`);
+      return;
+    }
+    const storeId = profile?.role === "manager" ? profile.store_id : employee.store_id ?? profile?.store_id ?? null;
+    if (!storeId) {
+      setErr("This assignment needs a store id.");
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.from("brand_rep_assignments").upsert({
+      month: monthISO,
+      store_id: storeId,
+      brand: assignBrand,
+      employee_id: assignEmployeeId,
+      active: true,
+    }, { onConflict: "month,store_id,brand,employee_id" });
+    setBusy(false);
+    if (error) setErr(error.message);
+    else {
+      setOk(`${employee.display_name} assigned to ${assignBrand}.`);
+      setAssignEmployeeId("");
+      load();
+    }
+  }
+
+  async function removeBrandAssignment(row: BrandRepAssignment) {
+    setErr(null);
+    setOk(null);
+    setBusy(true);
+    const { error } = await supabase.from("brand_rep_assignments").update({ active: false }).eq("id", row.id);
+    setBusy(false);
+    if (error) setErr(error.message);
+    else {
+      const employeeName = employeeById.get(row.employee_id)?.display_name ?? "Rep";
+      setOk(`${employeeName} removed from ${row.brand}.`);
+      load();
+    }
+  }
+
   return (
     <>
       <Topbar profile={profile} />
@@ -349,6 +434,16 @@ export default function Enhancers({ session }: { session: Session }) {
           )}
         </Collapsible>
 
+        <Collapsible title="Brand rep classifications" count={`${activeAssignments.length} assigned`} defaultOpen={false}>
+          {canEdit && <form className="adj-form rep-brand-form" onSubmit={assignRepToBrand}><div className="field"><label htmlFor="assign-brand">Brand</label><select id="assign-brand" required value={assignBrand} onChange={(e) => setAssignBrand(e.target.value)}><option value="" disabled>Choose…</option>{brandOptions.map((b) => <option key={b} value={b}>{b}</option>)}</select></div><div className="field grow"><label htmlFor="assign-rep">Rep</label><select id="assign-rep" required value={assignEmployeeId} onChange={(e) => setAssignEmployeeId(e.target.value)}><option value="" disabled>Choose…</option>{employees.map((e) => <option key={e.id} value={e.id}>{e.display_name}</option>)}</select></div><button className="btn-primary slim" disabled={busy} type="submit">Assign rep</button></form>}
+          <div className="brand-rep-grid">
+            {brandOptions.map((b) => {
+              const rows = assignmentsByBrand.get(b) ?? [];
+              return <div className="brand-rep-card" key={b}><div className="brand-rep-head"><span>{b}</span><small>{rows.length} rep(s)</small></div>{rows.length === 0 ? <div className="mini-empty">No reps assigned.</div> : <div className="chip-list compact">{rows.map((row) => <span className="chip" key={row.id}>{employeeById.get(row.employee_id)?.display_name ?? "Unknown rep"}{canEdit && <button className="chip-x" disabled={busy} onClick={() => removeBrandAssignment(row)}>×</button>}</span>)}</div>}</div>;
+            })}
+          </div>
+        </Collapsible>
+
         <Collapsible title="Priority list" count={`${stocks.length} stock number(s)`}>
           {stocks.length > 0 && <div className="chip-list">{stocks.map((s) => <span className="chip" key={s}>{s}{canEdit && <button className="chip-x" onClick={() => removeStock(s)}>×</button>}</span>)}</div>}
           {canEdit && <form className="adj-form stock-form" onSubmit={addStock}><div className="field grow"><label htmlFor="ps-paste">Paste stock numbers</label><textarea id="ps-paste" rows={2} value={stockPaste} onChange={(e) => setStockPaste(e.target.value)} /></div><button className="btn-primary slim" type="submit">Add to list</button></form>}
@@ -359,11 +454,14 @@ export default function Enhancers({ session }: { session: Session }) {
             {manualRules.length > 0 && (
               <div className="tablewrap"><table className="deals adj"><thead><tr><th>Brand</th><th>Manual enhancer rule</th><th className="r">Rate</th>{canEdit && <th></th>}</tr></thead><tbody>{manualRules.map((r) => <tr key={r.id}><td>{r.brand}</td><td className="note-cell">{r.label}</td><td className="r money pos">{rateLabel(r)}</td>{canEdit && <td className="r"><button className="btn-del" disabled={busy} onClick={() => removeManualRule(r)}>Remove rule</button></td>}</tr>)}</tbody></table></div>
             )}
-            <div className="tablewrap"><table className="deals adj"><thead><tr><th>Brand</th><th>Manual enhancer</th><th>Rep</th><th className="r">Rate</th><th className="r">Proposed</th><th className="r">Brand gross</th><th>Approved</th></tr></thead><tbody>{manualReview.map((row) => {
-              const key = `${row.rule_id}|${row.employee_id ?? row.rep}`;
-              const rowBusy = manualBusyKey === key || busy;
-              return <tr key={key}><td>{row.brand}</td><td className="note-cell">{row.label}</td><td>{row.rep}</td><td className="r money pos">{rateLabel(row)}</td><td className="r money pos">{moneyExact(row.proposed_amount)}</td><td className="r money">{money(row.brand_front_gross)}</td><td className="action-cell">{canEdit ? <><button type="button" className={row.approved ? "btn-approve" : "btn-secondary"} disabled={rowBusy || row.approved} onClick={() => setManualApproval(row, true)}>Yes</button><button type="button" className={row.approved ? "btn-secondary" : "btn-del"} disabled={rowBusy || !row.approved} onClick={() => setManualApproval(row, false)}>No</button></> : row.approved ? "Yes" : "No"}</td></tr>;
-            })}{manualReview.length === 0 && <tr><td colSpan={7} className="muted">No manual review rows. Assign brand reps to show spreadsheet-style manual enhancer approvals.</td></tr>}</tbody></table></div>
+            <div className="tablewrap"><table className="deals adj manual-review"><thead><tr><th>Brand</th><th>Manual enhancer</th><th>Rep</th><th className="r">Rate</th><th className="r">Proposed</th><th>Approved</th></tr></thead><tbody>{manualReviewGroups.map(([brandName, rows]) => {
+              const approvedForBrand = rows.filter((row) => row.approved).length;
+              return <Fragment key={brandName}><tr className="group-row"><td colSpan={6}><span>{brandName}</span><small>{approvedForBrand}/{rows.length} approved</small></td></tr>{rows.length === 0 ? <tr><td></td><td colSpan={5} className="muted">No classified reps for this brand.</td></tr> : rows.map((row) => {
+                const key = `${row.rule_id}|${row.employee_id ?? row.rep}`;
+                const rowBusy = manualBusyKey === key || busy;
+                return <tr key={key}><td></td><td className="note-cell">{row.label}</td><td>{row.rep}</td><td className="r money pos">{rateLabel(row)}</td><td className="r money pos">{moneyExact(row.proposed_amount)}</td><td className="action-cell">{canEdit ? <><button type="button" className={row.approved ? "btn-approve" : "btn-secondary"} disabled={rowBusy || row.approved} onClick={() => setManualApproval(row, true)}>Yes</button><button type="button" className={row.approved ? "btn-secondary" : "btn-del"} disabled={rowBusy || !row.approved} onClick={() => setManualApproval(row, false)}>No</button></> : row.approved ? "Yes" : "No"}</td></tr>;
+              })}</Fragment>;
+            })}{manualReviewGroups.length === 0 && <tr><td colSpan={6} className="muted">No manual review rows. Assign brand reps to show spreadsheet-style manual enhancer approvals.</td></tr>}</tbody></table></div>
           </Collapsible>
         )}
 
