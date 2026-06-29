@@ -119,26 +119,10 @@ export default function Calculations({ session }: { session: Session }) {
     setLoading(true);
     setErr(null);
     const scope = scopedStoreIds;
-    const planQuery = scope.length === 0
-      ? supabase.from("pay_plans").select("*").is("store_id", null).order("name")
-      : scope.length === 1
-        ? supabase.from("pay_plans").select("*").eq("store_id", scope[0]).order("name")
-        : supabase.from("pay_plans").select("*").in("store_id", scope).order("name");
-    const unitQuery = scope.length === 0
-      ? supabase.from("unit_enhancement_tiers").select("*").eq("effective_month", monthISO).is("store_id", null).order("min_units")
-      : scope.length === 1
-        ? supabase.from("unit_enhancement_tiers").select("*").eq("effective_month", monthISO).eq("store_id", scope[0]).order("min_units")
-        : supabase.from("unit_enhancement_tiers").select("*").eq("effective_month", monthISO).in("store_id", scope).order("min_units");
-    const miniQuery = scope.length === 0
-      ? supabase.from("mini_tiers").select("*").eq("effective_month", monthISO).is("store_id", null).order("min_units")
-      : scope.length === 1
-        ? supabase.from("mini_tiers").select("*").eq("effective_month", monthISO).eq("store_id", scope[0]).order("min_units")
-        : supabase.from("mini_tiers").select("*").eq("effective_month", monthISO).in("store_id", scope).order("min_units");
-    const buyFeeQuery = scope.length === 0
-      ? supabase.from("buy_fee_rules").select("*").eq("effective_month", monthISO).is("store_id", null).order("brand")
-      : scope.length === 1
-        ? supabase.from("buy_fee_rules").select("*").eq("effective_month", monthISO).eq("store_id", scope[0]).order("brand")
-        : supabase.from("buy_fee_rules").select("*").eq("effective_month", monthISO).in("store_id", scope).order("brand");
+    const planQuery = scope.length === 0 ? supabase.from("pay_plans").select("*").is("store_id", null).order("name") : scope.length === 1 ? supabase.from("pay_plans").select("*").eq("store_id", scope[0]).order("name") : supabase.from("pay_plans").select("*").in("store_id", scope).order("name");
+    const unitQuery = scope.length === 0 ? supabase.from("unit_enhancement_tiers").select("*").eq("effective_month", monthISO).is("store_id", null).order("min_units") : scope.length === 1 ? supabase.from("unit_enhancement_tiers").select("*").eq("effective_month", monthISO).eq("store_id", scope[0]).order("min_units") : supabase.from("unit_enhancement_tiers").select("*").eq("effective_month", monthISO).in("store_id", scope).order("min_units");
+    const miniQuery = scope.length === 0 ? supabase.from("mini_tiers").select("*").eq("effective_month", monthISO).is("store_id", null).order("min_units") : scope.length === 1 ? supabase.from("mini_tiers").select("*").eq("effective_month", monthISO).eq("store_id", scope[0]).order("min_units") : supabase.from("mini_tiers").select("*").eq("effective_month", monthISO).in("store_id", scope).order("min_units");
+    const buyFeeQuery = scope.length === 0 ? supabase.from("buy_fee_rules").select("*").eq("effective_month", monthISO).is("store_id", null).order("brand") : scope.length === 1 ? supabase.from("buy_fee_rules").select("*").eq("effective_month", monthISO).eq("store_id", scope[0]).order("brand") : supabase.from("buy_fee_rules").select("*").eq("effective_month", monthISO).in("store_id", scope).order("brand");
     const [planRes, unitRes, miniRes, buyFeeRes, catRes] = await Promise.all([
       planQuery,
       unitQuery,
@@ -156,9 +140,7 @@ export default function Calculations({ session }: { session: Session }) {
     setLoading(false);
   }, [monthISO, scopedStoreIds]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   async function save(action: () => PromiseLike<SaveResult>, message: string) {
     setBusy(true);
@@ -173,57 +155,16 @@ export default function Calculations({ session }: { session: Session }) {
     }
   }
 
-  async function addPlan(e: FormEvent) {
-    e.preventDefault();
-    await save(() => supabase.from("pay_plans").insert({ name: planName, store_id: scopedStoreId, brand: planBrand || null, base_rate_pct: Number(baseRate), rate_cap_pct: Number(capRate), active: true }), "Plan added.");
-  }
-
-  async function savePlan(plan: PayPlan) {
-    await save(() => supabase.from("pay_plans").update({ name: inputValue(`plan-name-${plan.id}`), brand: inputValue(`plan-brand-${plan.id}`) || null, base_rate_pct: Number(inputValue(`plan-base-${plan.id}`)), rate_cap_pct: Number(inputValue(`plan-cap-${plan.id}`)), active: inputChecked(`plan-active-${plan.id}`) }).eq("id", plan.id), "Plan saved.");
-  }
-
-  async function addUnitTier(e: FormEvent) {
-    e.preventDefault();
-    await save(() => supabase.from("unit_enhancement_tiers").insert({ store_id: scopedStoreId, effective_month: monthISO, min_units: Number(unitMin), rate_pct: Number(unitRate), label: unitLabel || null, active: true }), "Unit tier added.");
-    setUnitMin(""); setUnitRate(""); setUnitLabel("");
-  }
-
-  async function saveUnitTier(tier: UnitTier) {
-    await save(() => supabase.from("unit_enhancement_tiers").update({ min_units: Number(inputValue(`unit-min-${tier.id}`)), rate_pct: Number(inputValue(`unit-rate-${tier.id}`)), label: inputValue(`unit-label-${tier.id}`) || null, active: inputChecked(`unit-active-${tier.id}`) }).eq("id", tier.id), "Unit tier saved.");
-  }
-
-  async function addMiniTier(e: FormEvent) {
-    e.preventDefault();
-    await save(() => supabase.from("mini_tiers").insert({ store_id: scopedStoreId, effective_month: monthISO, min_units: Number(miniMin), amount: Number(miniAmount), label: miniLabel || null, active: true }), "Mini tier added.");
-    setMiniMin(""); setMiniAmount(""); setMiniLabel("");
-  }
-
-  async function saveMiniTier(tier: MiniTier) {
-    await save(() => supabase.from("mini_tiers").update({ min_units: Number(inputValue(`mini-min-${tier.id}`)), amount: Number(inputValue(`mini-amount-${tier.id}`)), label: inputValue(`mini-label-${tier.id}`) || null, active: inputChecked(`mini-active-${tier.id}`) }).eq("id", tier.id), "Mini tier saved.");
-  }
-
-  async function addBuyFeeRule(e: FormEvent) {
-    e.preventDefault();
-    const brand = buyBrand.trim();
-    const pattern = buyPattern.trim() || `%${brand}%`;
-    await save(() => supabase.from("buy_fee_rules").insert({ store_id: scopedStoreId, effective_month: monthISO, brand, make_pattern: pattern, amount: Number(buyAmount), active: true }), "Buy fee rule added.");
-    setBuyBrand(""); setBuyPattern(""); setBuyAmount("");
-  }
-
-  async function saveBuyFeeRule(rule: BuyFeeRule) {
-    await save(() => supabase.from("buy_fee_rules").update({ brand: inputValue(`buy-brand-${rule.id}`), make_pattern: inputValue(`buy-pattern-${rule.id}`), amount: Number(inputValue(`buy-amount-${rule.id}`)), active: inputChecked(`buy-active-${rule.id}`) }).eq("id", rule.id), "Buy fee rule saved.");
-  }
-
-  async function addCategory(e: FormEvent) {
-    e.preventDefault();
-    const key = cleanKey(catKey || catLabel);
-    await save(() => supabase.from("adjustment_category_options").upsert({ key, label: catLabel, default_amount: numberOrNull(catAmount), default_pct: numberOrNull(catPct), active: true, sort_order: categories.length * 10 + 10 }), "Category saved.");
-    setCatKey(""); setCatLabel(""); setCatAmount(""); setCatPct("");
-  }
-
-  async function saveCategory(category: CategoryOption) {
-    await save(() => supabase.from("adjustment_category_options").update({ label: inputValue(`cat-label-${category.key}`), default_amount: numberOrNull(inputValue(`cat-amount-${category.key}`)), default_pct: numberOrNull(inputValue(`cat-pct-${category.key}`)), active: inputChecked(`cat-active-${category.key}`) }).eq("key", category.key), "Category saved.");
-  }
+  async function addPlan(e: FormEvent) { e.preventDefault(); await save(() => supabase.from("pay_plans").insert({ name: planName, store_id: scopedStoreId, brand: planBrand || null, base_rate_pct: Number(baseRate), rate_cap_pct: Number(capRate), active: true }), "Plan added."); }
+  async function savePlan(plan: PayPlan) { await save(() => supabase.from("pay_plans").update({ name: inputValue(`plan-name-${plan.id}`), brand: inputValue(`plan-brand-${plan.id}`) || null, base_rate_pct: Number(inputValue(`plan-base-${plan.id}`)), rate_cap_pct: Number(inputValue(`plan-cap-${plan.id}`)), active: inputChecked(`plan-active-${plan.id}`) }).eq("id", plan.id), "Plan saved."); }
+  async function addUnitTier(e: FormEvent) { e.preventDefault(); await save(() => supabase.from("unit_enhancement_tiers").insert({ store_id: scopedStoreId, effective_month: monthISO, min_units: Number(unitMin), rate_pct: Number(unitRate), label: unitLabel || null, active: true }), "Unit tier added."); setUnitMin(""); setUnitRate(""); setUnitLabel(""); }
+  async function saveUnitTier(tier: UnitTier) { await save(() => supabase.from("unit_enhancement_tiers").update({ min_units: Number(inputValue(`unit-min-${tier.id}`)), rate_pct: Number(inputValue(`unit-rate-${tier.id}`)), label: inputValue(`unit-label-${tier.id}`) || null, active: inputChecked(`unit-active-${tier.id}`) }).eq("id", tier.id), "Unit tier saved."); }
+  async function addMiniTier(e: FormEvent) { e.preventDefault(); await save(() => supabase.from("mini_tiers").insert({ store_id: scopedStoreId, effective_month: monthISO, min_units: Number(miniMin), amount: Number(miniAmount), label: miniLabel || null, active: true }), "Mini tier added."); setMiniMin(""); setMiniAmount(""); setMiniLabel(""); }
+  async function saveMiniTier(tier: MiniTier) { await save(() => supabase.from("mini_tiers").update({ min_units: Number(inputValue(`mini-min-${tier.id}`)), amount: Number(inputValue(`mini-amount-${tier.id}`)), label: inputValue(`mini-label-${tier.id}`) || null, active: inputChecked(`mini-active-${tier.id}`) }).eq("id", tier.id), "Mini tier saved."); }
+  async function addBuyFeeRule(e: FormEvent) { e.preventDefault(); const brand = buyBrand.trim(); const pattern = buyPattern.trim() || `%${brand}%`; await save(() => supabase.from("buy_fee_rules").insert({ store_id: scopedStoreId, effective_month: monthISO, brand, make_pattern: pattern, amount: Number(buyAmount), active: true }), "Buy fee rule added."); setBuyBrand(""); setBuyPattern(""); setBuyAmount(""); }
+  async function saveBuyFeeRule(rule: BuyFeeRule) { await save(() => supabase.from("buy_fee_rules").update({ brand: inputValue(`buy-brand-${rule.id}`), make_pattern: inputValue(`buy-pattern-${rule.id}`), amount: Number(inputValue(`buy-amount-${rule.id}`)), active: inputChecked(`buy-active-${rule.id}`) }).eq("id", rule.id), "Buy fee rule saved."); }
+  async function addCategory(e: FormEvent) { e.preventDefault(); const key = cleanKey(catKey || catLabel); await save(() => supabase.from("adjustment_category_options").upsert({ key, label: catLabel, default_amount: numberOrNull(catAmount), default_pct: numberOrNull(catPct), active: true, sort_order: categories.length * 10 + 10 }), "Category saved."); setCatKey(""); setCatLabel(""); setCatAmount(""); setCatPct(""); }
+  async function saveCategory(category: CategoryOption) { await save(() => supabase.from("adjustment_category_options").update({ label: inputValue(`cat-label-${category.key}`), default_amount: numberOrNull(inputValue(`cat-amount-${category.key}`)), default_pct: numberOrNull(inputValue(`cat-pct-${category.key}`)), active: inputChecked(`cat-active-${category.key}`) }).eq("key", category.key), "Category saved."); }
 
   return (
     <>
@@ -240,7 +181,7 @@ export default function Calculations({ session }: { session: Session }) {
             <Collapsible title="Unit rate enhancement" count={`${unitTiers.length} tier(s)`}><div className="tablewrap"><table className="deals adj"><thead><tr><th className="r">Min units</th><th className="r">Rate %</th><th>Label</th><th>Active</th><th></th></tr></thead><tbody>{unitTiers.map((t) => <tr key={t.id}><td className="r"><input className="mini" id={`unit-min-${t.id}`} defaultValue={t.min_units} /></td><td className="r"><input className="mini" id={`unit-rate-${t.id}`} defaultValue={t.rate_pct} /></td><td><input id={`unit-label-${t.id}`} defaultValue={t.label ?? ""} /></td><td><input id={`unit-active-${t.id}`} type="checkbox" defaultChecked={t.active} /></td><td className="action-cell"><button type="button" className="btn-approve" disabled={busy} onClick={() => saveUnitTier(t)}>Save</button><button type="button" className="btn-del" disabled={busy} onClick={() => save(() => supabase.from("unit_enhancement_tiers").delete().eq("id", t.id), "Unit tier removed.")}>Remove</button></td></tr>)}</tbody></table></div><form className="adj-form stock-form" onSubmit={addUnitTier}><div className="field"><label>Min units</label><input value={unitMin} onChange={(e) => setUnitMin(e.target.value)} /></div><div className="field"><label>Rate %</label><input value={unitRate} onChange={(e) => setUnitRate(e.target.value)} /></div><div className="field grow"><label>Label</label><input value={unitLabel} onChange={(e) => setUnitLabel(e.target.value)} /></div><button className="btn-primary slim" disabled={busy} type="submit">Add tier</button></form></Collapsible>
             <Collapsible title="Minis" count={`${miniTiers.length} tier(s)`}><div className="tablewrap"><table className="deals adj"><thead><tr><th className="r">Min units</th><th className="r">Amount</th><th>Label</th><th>Active</th><th></th></tr></thead><tbody>{miniTiers.map((t) => <tr key={t.id}><td className="r"><input className="mini" id={`mini-min-${t.id}`} defaultValue={t.min_units} /></td><td className="r"><input className="mini" id={`mini-amount-${t.id}`} defaultValue={amountInput(t.amount)} /></td><td><input id={`mini-label-${t.id}`} defaultValue={t.label ?? ""} /></td><td><input id={`mini-active-${t.id}`} type="checkbox" defaultChecked={t.active} /></td><td className="action-cell"><button type="button" className="btn-approve" disabled={busy} onClick={() => saveMiniTier(t)}>Save</button><button type="button" className="btn-del" disabled={busy} onClick={() => save(() => supabase.from("mini_tiers").delete().eq("id", t.id), "Mini tier removed.")}>Remove</button></td></tr>)}</tbody></table></div><form className="adj-form stock-form" onSubmit={addMiniTier}><div className="field"><label>Min units</label><input value={miniMin} onChange={(e) => setMiniMin(e.target.value)} /></div><div className="field"><label>Amount</label><input value={miniAmount} onChange={(e) => setMiniAmount(e.target.value)} placeholder="1500.00" /></div><div className="field grow"><label>Label</label><input value={miniLabel} onChange={(e) => setMiniLabel(e.target.value)} /></div><button className="btn-primary slim" disabled={busy} type="submit">Add mini</button></form></Collapsible>
             <Collapsible title="Buy fees" count={`${buyFeeRules.length} brand rule(s)`}><div className="tablewrap"><table className="deals adj"><thead><tr><th>Brand</th><th>Vehicle match</th><th className="r">Amount</th><th>Active</th><th></th></tr></thead><tbody>{buyFeeRules.map((r) => <tr key={r.id}><td><input id={`buy-brand-${r.id}`} defaultValue={r.brand} /></td><td><input id={`buy-pattern-${r.id}`} defaultValue={r.make_pattern} /></td><td className="r"><input className="mini" id={`buy-amount-${r.id}`} defaultValue={amountInput(r.amount)} /></td><td><input id={`buy-active-${r.id}`} type="checkbox" defaultChecked={r.active} /></td><td className="action-cell"><button type="button" className="btn-approve" disabled={busy} onClick={() => saveBuyFeeRule(r)}>Save</button><button type="button" className="btn-del" disabled={busy} onClick={() => save(() => supabase.from("buy_fee_rules").delete().eq("id", r.id), "Buy fee rule removed.")}>Remove</button></td></tr>)}</tbody></table></div><form className="adj-form buy-fee-form" onSubmit={addBuyFeeRule}><div className="field"><label>Brand</label><input value={buyBrand} onChange={(e) => setBuyBrand(e.target.value)} placeholder="McLaren" /></div><div className="field"><label>Vehicle match</label><input value={buyPattern} onChange={(e) => setBuyPattern(e.target.value)} placeholder="%McLaren%" /></div><div className="field"><label>Amount</label><input value={buyAmount} onChange={(e) => setBuyAmount(e.target.value)} placeholder="1500.00" /></div><button className="btn-primary slim" disabled={busy} type="submit">Add buy fee</button></form></Collapsible>
-            <Collapsible title="Adjustment categories" count={`${categories.length} category option(s)`}><div className="tablewrap"><table className="deals adj"><thead><tr><th>Key</th><th>Label</th><th className="r">Default $</th><th className="r">Default %</th><th>Active</th><th></th></tr></thead><tbody>{categories.map((c) => <tr key={c.key}><td className="num">{c.key}</td><td><input id={`cat-label-${c.key}`} defaultValue={c.label} /></td><td className="r"><input className="mini" id={`cat-amount-${c.key}`} defaultValue={amountInput(c.default_amount)} /></td><td className="r"><input className="mini" id={`cat-pct-${c.key}`} defaultValue={c.default_pct ?? ""} /></td><td><input id={`cat-active-${c.key}`} type="checkbox" defaultChecked={c.active} /></td><td className="action-cell"><button type="button" className="btn-approve" disabled={busy} onClick={() => saveCategory(c)}>Save</button><button type="button" className="btn-del" disabled={busy} onClick={() => save(() => supabase.from("adjustment_category_options").delete().eq("key", c.key), "Category removed.")}>Remove</button></td></tr>)}</tbody></table></div><form className="adj-form stock-form" onSubmit={addCategory}><div className="field"><label>Key</label><input value={catKey} onChange={(e) => setCatKey(e.target.value)} /></div><div className="field"><label>Label</label><input value={catLabel} onChange={(e) => setCatLabel(e.target.value)} /></div><div className="field"><label>Default $</label><input value={catAmount} onChange={(e) => setCatAmount(e.target.value)} placeholder="500.00" /></div><div className="field"><label>Default %</label><input value={catPct} onChange={(e) => setCatPct(e.target.value)} /></div><button className="btn-primary slim" disabled={busy} type="submit">Save category</button></form></Collapsible>
+            <Collapsible title="Adjustment categories" count={`${categories.length} category option(s)`}><div className="notice">These categories drive the Type dropdown on manual Spiffs and adjustments. Prefill fields are optional defaults for that form only. Leave them blank when the amount varies by deal, rep, or approval.</div><div className="tablewrap"><table className="deals adj"><thead><tr><th>Key</th><th>Label</th><th className="r">Prefill $</th><th className="r">Prefill %</th><th>Active</th><th></th></tr></thead><tbody>{categories.map((c) => <tr key={c.key}><td className="num">{c.key}</td><td><input id={`cat-label-${c.key}`} defaultValue={c.label} /></td><td className="r"><input className="mini" id={`cat-amount-${c.key}`} defaultValue={amountInput(c.default_amount)} /></td><td className="r"><input className="mini" id={`cat-pct-${c.key}`} defaultValue={c.default_pct ?? ""} /></td><td><input id={`cat-active-${c.key}`} type="checkbox" defaultChecked={c.active} /></td><td className="action-cell"><button type="button" className="btn-approve" disabled={busy} onClick={() => saveCategory(c)}>Save</button><button type="button" className="btn-del" disabled={busy} onClick={() => save(() => supabase.from("adjustment_category_options").delete().eq("key", c.key), "Category removed.")}>Remove</button></td></tr>)}</tbody></table></div><form className="adj-form stock-form" onSubmit={addCategory}><div className="field"><label>Key</label><input value={catKey} onChange={(e) => setCatKey(e.target.value)} /></div><div className="field"><label>Label</label><input value={catLabel} onChange={(e) => setCatLabel(e.target.value)} /></div><div className="field"><label>Prefill $</label><input value={catAmount} onChange={(e) => setCatAmount(e.target.value)} placeholder="500.00" /></div><div className="field"><label>Prefill %</label><input value={catPct} onChange={(e) => setCatPct(e.target.value)} /></div><button className="btn-primary slim" disabled={busy} type="submit">Save category</button></form></Collapsible>
           </>
         )}
         {isAdmin && loading && <div className="loading">Loading calculations…</div>}
