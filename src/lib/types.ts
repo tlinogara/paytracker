@@ -115,6 +115,8 @@ export type EnhancerMetric =
   | "trades_acquisitions"
   | "manual";
 
+export type AutoEnhancerMetric = Exclude<EnhancerMetric, "manual">;
+
 export interface EnhancerRule {
   id: string;
   month: string;
@@ -126,6 +128,8 @@ export interface EnhancerRule {
   flat_amount: number | null;
   metric: EnhancerMetric;
   threshold: number;
+  or_metric: AutoEnhancerMetric | null;
+  or_threshold: number | null;
 }
 
 export interface EnhancerStatus {
@@ -136,7 +140,7 @@ export interface EnhancerStatus {
   label: string;
   pct: number | null;
   flat_amount: number | null;
-  metric: Exclude<EnhancerMetric, "manual">;
+  metric: AutoEnhancerMetric;
   threshold: number;
   rep: string;
   employee_id: string | null;
@@ -146,6 +150,9 @@ export interface EnhancerStatus {
   qualified: boolean;
   proposed_amount: number | null;
   total_commissionable_gross: number | null;
+  or_metric: AutoEnhancerMetric | null;
+  or_threshold: number | null;
+  or_metric_value: number | null;
 }
 
 export interface CommissionLine {
