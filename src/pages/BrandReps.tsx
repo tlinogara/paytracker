@@ -8,6 +8,14 @@ import Collapsible from "../components/Collapsible";
 
 const ALL_BRANDS = "All brands";
 
+function brandRank(brand: string): string {
+  return brand === ALL_BRANDS ? "zzzzzz" : brand.toLocaleLowerCase();
+}
+
+function sortBrands(brands: string[]): string[] {
+  return [...brands].sort((a, b) => brandRank(a).localeCompare(brandRank(b)));
+}
+
 type BrandRepClassification = {
   id: string;
   store_id: string | null;
@@ -31,7 +39,13 @@ export default function BrandReps({ session }: { session: Session }) {
 
   useEffect(() => {
     supabase.from("profiles").select("*").eq("id", session.user.id).single().then(({ data }) => setProfile((data as Profile) ?? null));
-    supabase.from("brand_list").select("*").order("n", { ascending: false }).then(({ data }) => setBrands(((data ?? []) as { brand: string }[]).map((b) => b.brand).filter((b) => b !== ALL_BRANDS)));
+    supabase
+      .from("brand_list")
+      .select("*")
+      .order("n", { ascending: false })
+      .then(({ data }) =>
+        setBrands(sortBrands(((data ?? []) as { brand: string }[]).map((b) => b.brand).filter((b) => b !== ALL_BRANDS)))
+      );
   }, [session.user.id]);
 
   const load = useCallback(async () => {
@@ -44,7 +58,11 @@ export default function BrandReps({ session }: { session: Session }) {
     const e = employeeRes.error || classificationRes.error;
     if (e) setErr(e.message);
     setEmployees((employeeRes.data ?? []) as Employee[]);
-    setClassifications((classificationRes.data ?? []) as BrandRepClassification[]);
+    setClassifications(
+      ((classificationRes.data ?? []) as BrandRepClassification[]).sort(
+        (a, b) => brandRank(a.brand).localeCompare(brandRank(b.brand))
+      )
+    );
     setLoading(false);
   }, []);
 
