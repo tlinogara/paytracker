@@ -1,4 +1,4 @@
-export type Role = "rep" | "manager" | "payroll" | "admin";
+export type Role = "rep" | "manager" | "payroll" | "admin" | "sales_rep" | "brand_manager" | "general_sales_manager" | "payroll_manager";
 
 export interface Store {
   id: string;
