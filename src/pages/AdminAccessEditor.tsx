@@ -8,6 +8,7 @@ const ROLES: Role[] = ["sales_rep", "brand_manager", "general_sales_manager", "p
 const STORE_ACCESS_ROLES = ["general_sales_manager", "payroll_manager", "admin"];
 
 type Store = { id: string; name: string; active: boolean | null };
+type SaveResult = { error: { message: string } | null };
 
 function roleLabel(role: string) {
   if (role === "sales_rep") return "Sales rep";
@@ -68,7 +69,7 @@ export default function AdminAccessEditor({ profile, onSaved }: { profile: Profi
     setStoreId(profile.store_id || "");
   }, [profile]);
 
-  async function run(action: () => Promise<{ error: { message: string } | null }>, message: string) {
+  async function run(action: () => PromiseLike<SaveResult>, message: string) {
     setBusy(true);
     setErr(null);
     setOk(null);
