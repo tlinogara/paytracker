@@ -179,6 +179,28 @@ export default function Adjustments({
   return (
     <>
       {err && <div className="notice">{err}</div>}
+      {canEdit && (
+        <form className="adj-form" onSubmit={add}>
+          <div className="field">
+            <label htmlFor="adj-rep">Salesperson</label>
+            <input id="adj-rep" list="rep-options" required value={repValue} onChange={(e) => setRep(e.target.value)} />
+            <datalist id="rep-options">
+              {reps.map((r) => <option key={r.rep} value={r.rep} />)}
+            </datalist>
+          </div>
+          <div className="field">
+            <label htmlFor="adj-cat">Type</label>
+            <select id="adj-cat" value={category} onChange={(e) => setCategoryAndDefaults(e.target.value)}>
+              {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+            </select>
+          </div>
+          <div className="field"><label htmlFor="adj-amt">Amount $</label><input id="adj-amt" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500 or -250" /></div>
+          <div className="field"><label htmlFor="adj-pct">or %</label><input id="adj-pct" inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="1.25" /></div>
+          <div className="field"><label htmlFor="adj-deal">Deal #</label><input id="adj-deal" value={dealNumber} onChange={(e) => setDealNumber(e.target.value)} /></div>
+          <div className="field grow"><label htmlFor="adj-note">Note</label><input id="adj-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason or source" /></div>
+          <button className="btn-primary slim" disabled={busy} type="submit">{busy ? "Saving…" : "Add entry"}</button>
+        </form>
+      )}
       {entries.length === 0 ? (
         <div className="tablewrap">
           <div className="empty">No manual entries for this month{selectedRep ? ` for ${selectedRep}` : ""}.</div>
@@ -217,28 +239,6 @@ export default function Adjustments({
             </tbody>
           </table>
         </div>
-      )}
-      {canEdit && (
-        <form className="adj-form" onSubmit={add}>
-          <div className="field">
-            <label htmlFor="adj-rep">Salesperson</label>
-            <input id="adj-rep" list="rep-options" required value={repValue} onChange={(e) => setRep(e.target.value)} />
-            <datalist id="rep-options">
-              {reps.map((r) => <option key={r.rep} value={r.rep} />)}
-            </datalist>
-          </div>
-          <div className="field">
-            <label htmlFor="adj-cat">Type</label>
-            <select id="adj-cat" value={category} onChange={(e) => setCategoryAndDefaults(e.target.value)}>
-              {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-            </select>
-          </div>
-          <div className="field"><label htmlFor="adj-amt">Amount $</label><input id="adj-amt" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500 or -250" /></div>
-          <div className="field"><label htmlFor="adj-pct">or %</label><input id="adj-pct" inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="1.25" /></div>
-          <div className="field"><label htmlFor="adj-deal">Deal #</label><input id="adj-deal" value={dealNumber} onChange={(e) => setDealNumber(e.target.value)} /></div>
-          <div className="field grow"><label htmlFor="adj-note">Note</label><input id="adj-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason or source" /></div>
-          <button className="btn-primary slim" disabled={busy} type="submit">{busy ? "Saving…" : "Add entry"}</button>
-        </form>
       )}
     </>
   );
