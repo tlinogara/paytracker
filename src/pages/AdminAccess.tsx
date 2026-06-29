@@ -67,6 +67,14 @@ export default function AdminAccess({ session }: { session: Session }) {
     [brandAccess, selectedUserId],
   );
 
+  const effectiveStores = useMemo(() => {
+    const names = new Set<string>();
+    for (const row of selectedStoreAccess) names.add(row.stores?.name || row.note || row.store_id || "All locations");
+    for (const row of selectedBrandAccess) names.add(row.stores?.name || row.store_id || "Store");
+    if (selectedProfile?.store_name) names.add(selectedProfile.store_name);
+    return Array.from(names);
+  }, [selectedBrandAccess, selectedProfile, selectedStoreAccess]);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -118,14 +126,8 @@ export default function AdminAccess({ session }: { session: Session }) {
     const role = normalizeRole(profile.role);
     if (role === "admin") return "All locations, all users, all settings, and access management.";
     if (role === "payroll_manager") return "All locations, payroll review, imports, month close, and commission settings.";
-    if (role === "general_sales_manager") {
-      if (selectedStoreAccess.length) return selectedStoreAccess.map((row) => row.stores?.name || row.note || row.store_id || "Store").join(", ");
-      return profile.store_name || "Assigned location.";
-    }
-    if (role === "brand_manager") {
-      if (selectedBrandAccess.length) return selectedBrandAccess.map((row) => `${row.stores?.name || "Store"}: ${row.brand}`).join(", ");
-      return "Assigned brand team.";
-    }
+    if (role === "general_sales_manager") return effectiveStores.length ? effectiveStores.join(", ") : profile.store_name || "Assigned location.";
+    if (role === "brand_manager") return selectedBrandAccess.length ? selectedBrandAccess.map((row) => row.brand).filter(Boolean).join(", ") : "Assigned brand team.";
     return profile.rep_name || profile.full_name || "Own deals and own pay breakdown.";
   }
 
@@ -144,7 +146,7 @@ export default function AdminAccess({ session }: { session: Session }) {
 
         {!loading && isAdmin && (
           <div className="grid two">
-            <section className="card">
+            <section className="card access-card">
               <h3>People</h3>
               <div className="tablewrap">
                 <table className="deals adj">
@@ -157,7 +159,7 @@ export default function AdminAccess({ session }: { session: Session }) {
                         <td>{profileName(profile)}<div className="muted">{profile.email}</div></td>
                         <td>{roleLabel(profile.role)}</td>
                         <td>{profile.store_name ?? "All or scoped"}</td>
-                        <td className="r"><button className="btn-primary slim" onClick={() => setSelectedUserId(profile.id)}>Preview</button></td>
+                        <td className="r"><button className="btn-primary slim" onClick={() => setSelectedUserId(profile.id)}>Manage</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -165,28 +167,24 @@ export default function AdminAccess({ session }: { session: Session }) {
               </div>
             </section>
 
-            <section className="card">
+            <section className="card access-card">
               <h3>Preview</h3>
               {selectedProfile ? (
-                <div>
-                  <div className="kpi-row">
-                    <div className="kpi"><span>User</span><strong>{profileName(selectedProfile)}</strong></div>
-                    <div className="kpi"><span>Role</span><strong>{roleLabel(selectedProfile.role)}</strong></div>
+                <div className="access-pane">
+                  <div className="access-summary">
+                    <div><span>User</span><strong>{profileName(selectedProfile)}</strong></div>
+                    <div><span>Role</span><strong>{roleLabel(selectedProfile.role)}</strong></div>
                   </div>
                   <div className="notice">Effective scope: {effectiveScope(selectedProfile)}</div>
                   <h4>Store access</h4>
-                  <div className="tablewrap">
-                    <table className="deals adj"><tbody>
-                      {selectedStoreAccess.length === 0 && <tr><td>No explicit store scope.</td></tr>}
-                      {selectedStoreAccess.map((row, idx) => <tr key={`${row.user_id}-store-${idx}`}><td>{row.stores?.name || row.store_id || "Store"}</td><td>{row.access_role || "store access"}</td></tr>)}
-                    </tbody></table>
+                  <div className="scope-list">
+                    {effectiveStores.length === 0 && <div className="scope-item muted">No store scope.</div>}
+                    {effectiveStores.map((store, idx) => <div className="scope-item" key={`${store}-${idx}`}><strong>{store}</strong></div>)}
                   </div>
                   <h4>Brand access</h4>
-                  <div className="tablewrap">
-                    <table className="deals adj"><tbody>
-                      {selectedBrandAccess.length === 0 && <tr><td>No explicit brand scope.</td></tr>}
-                      {selectedBrandAccess.map((row, idx) => <tr key={`${row.user_id}-brand-${idx}`}><td>{row.stores?.name || row.store_id || "Store"}</td><td>{row.brand || "Brand"}</td></tr>)}
-                    </tbody></table>
+                  <div className="scope-list">
+                    {selectedBrandAccess.length === 0 && <div className="scope-item muted">No brand scope.</div>}
+                    {selectedBrandAccess.map((row, idx) => <div className="scope-item" key={`${row.user_id}-brand-${idx}`}><strong>{row.brand || "Brand"}</strong><span>{row.stores?.name || row.store_id || "Store"}</span></div>)}
                   </div>
                 </div>
               ) : <div className="empty">Select a user to preview their profile and permissions.</div>}
