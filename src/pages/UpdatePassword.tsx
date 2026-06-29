@@ -18,7 +18,7 @@ export default function UpdatePassword() {
       return;
     }
     if (password !== confirm) {
-      setErr("Passwords don't match.");
+      setErr("Passwords do not match.");
       return;
     }
     setBusy(true);
@@ -31,44 +31,15 @@ export default function UpdatePassword() {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
-        <span className="wordmark">
-          Pay<span>Track</span>
-        </span>
-        <p className="lede">Set a password for faster sign-in next time.</p>
-
+        <span className="wordmark">Pay<span>Track</span></span>
+        <p className="lede">Set a password for faster sign in next time.</p>
         {err && <div className="form-msg err">{err}</div>}
-
         <form onSubmit={submit}>
-          <div className="field">
-            <label htmlFor="pw">New password</label>
-            <input
-              id="pw"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="pw2">Confirm password</label>
-            <input
-              id="pw2"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-            />
-          </div>
-          <button className="btn-primary" disabled={busy} type="submit">
-            {busy ? "Saving…" : "Save password"}
-          </button>
+          <div className="field"><label htmlFor="pw">New password</label><input id="pw" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+          <div className="field"><label htmlFor="pw2">Confirm password</label><input id="pw2" type="password" autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} /></div>
+          <button className="btn-primary" disabled={busy} type="submit">{busy ? "Saving…" : "Save password"}</button>
         </form>
-
-        <div className="auth-alt">
-          <Link to="/">Skip for now</Link>
-        </div>
+        <div className="auth-alt"><Link to="/">Skip for now</Link></div>
       </div>
     </div>
   );

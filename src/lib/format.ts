@@ -1,13 +1,25 @@
 const usd = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
-  maximumFractionDigits: 0,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 });
 
 const usdCents = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
   minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const pacificDateTime = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Los_Angeles",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZoneName: "short",
 });
 
 export function money(n: number | null | undefined): string {
@@ -45,10 +57,21 @@ export function shortDate(iso: string | null): string {
   return `${String(m).padStart(2, "0")}/${String(day).padStart(2, "0")}/${y}`;
 }
 
+export function formatPacificDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return pacificDateTime.format(date);
+}
+
 export function isNewStock(stockType: string | null): boolean | null {
   if (!stockType) return null;
   const s = stockType.toLowerCase();
   if (s.includes("new")) return true;
   if (s.includes("used") || s.includes("pre")) return false;
   return null;
+}
+
+export function safeCount(n: number | null | undefined): number {
+  return n ?? 0;
 }

@@ -1,0 +1,1 @@
+alter table public.sales_deals add column if not exists acquisition_acv numeric, add column if not exists acquisition_stock_number text; create or replace function public.trade_vehicle_text(j jsonb) returns text language sql immutable as $$ select nullif(trim(regexp_replace(coalesce(public.clean_text(j ->> 'Trade Ins'), ''), ',\\s*$', '')), '') $$;

@@ -1,5 +1,7 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+
+const MONTH_STORAGE_KEY = "paytrack:selectedMonth";
 
 function currentMonthParam(): string {
   const now = new Date();
@@ -23,38 +25,70 @@ function dateToParam(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/**
- * Selected month, stored in the URL (?month=YYYY-MM) so it persists across
- * navigation between Dashboard and Enhancers, survives refresh, and makes
- * links shareable. Falls back to the current month when absent or invalid.
- *
- * IMPORTANT: the returned `month` Date is memoized on the canonical
- * "YYYY-MM" string, so its reference is stable across renders while the
- * month is unchanged. Effects that depend on `month` therefore fire only
- * when the month actually changes — not on every render.
- */
+function readStoredMonthParam(): string | null {
+  if (typeof window === "undefined") return null;
+  const stored = window.sessionStorage.getItem(MONTH_STORAGE_KEY);
+  return isValidMonthParam(stored) ? stored : null;
+}
+
+function writeStoredMonthParam(monthParam: string): void {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(MONTH_STORAGE_KEY, monthParam);
+}
+
+export function monthHref(path: string, monthParam: string): string {
+  const [pathname, rawSearch = ""] = path.split("?");
+  const params = new URLSearchParams(rawSearch);
+
+  if (monthParam === currentMonthParam()) {
+    params.delete("month");
+  } else {
+    params.set("month", monthParam);
+  }
+
+  const search = params.toString();
+  return search ? `${pathname}?${search}` : pathname;
+}
+
+export function useMonthLink(): (path: string) => string {
+  const [params] = useSearchParams();
+  const raw = params.get("month");
+
+  const monthParam = useMemo(() => {
+    if (isValidMonthParam(raw)) return raw;
+    return readStoredMonthParam() ?? currentMonthParam();
+  }, [raw]);
+
+  return useCallback((path: string) => monthHref(path, monthParam), [monthParam]);
+}
+
 export function useMonth(): {
   month: Date;
-  monthParam: string; // canonical "YYYY-MM"
+  monthParam: string;
   setMonth: (d: Date) => void;
   isCurrentMonth: boolean;
 } {
   const [params, setParams] = useSearchParams();
   const raw = params.get("month");
 
-  // Canonical string is the source of truth; the Date is derived from it.
-  const monthParam = isValidMonthParam(raw) ? raw : currentMonthParam();
+  const monthParam = useMemo(() => {
+    if (isValidMonthParam(raw)) return raw;
+    return readStoredMonthParam() ?? currentMonthParam();
+  }, [raw]);
 
-  // Stable Date reference: only rebuilt when monthParam changes.
   const month = useMemo(() => paramToDate(monthParam), [monthParam]);
+
+  useEffect(() => {
+    writeStoredMonthParam(monthParam);
+  }, [monthParam]);
 
   const setMonth = useCallback(
     (d: Date) => {
       const target = dateToParam(d);
+      writeStoredMonthParam(target);
       setParams(
         (prev) => {
           const next = new URLSearchParams(prev);
-          // Omit the param for the current month to keep URLs clean.
           if (target === currentMonthParam()) next.delete("month");
           else next.set("month", target);
           return next;

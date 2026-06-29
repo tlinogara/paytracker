@@ -19,17 +19,10 @@ export default function Login() {
     setBusy(true);
     try {
       if (mode === "password") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) setErr(error.message);
-        // success: App's onAuthStateChange redirects automatically
       } else {
-        const { error } = await supabase.auth.signInWithOtp({
-          email: email.trim(),
-          options: { emailRedirectTo: window.location.origin },
-        });
+        const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: window.location.origin } });
         if (error) setErr(error.message);
         else setOk("Login link sent. Check your email on this device.");
       }
@@ -41,63 +34,17 @@ export default function Login() {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
-        <span className="wordmark">
-          Pay<span>Track</span>
-        </span>
-       
-
+        <span className="wordmark">Pay<span>Track</span></span>
+        <p className="lede">Secure commission portal for sales, managers, payroll, and admins.</p>
         {err && <div className="form-msg err">{err}</div>}
         {ok && <div className="form-msg ok">{ok}</div>}
-
         <form onSubmit={submit}>
-          <div className="field">
-            <label htmlFor="email">Work email</label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-
-          {mode === "password" && (
-            <div className="field">
-              <label htmlFor="password">Password</label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-          )}
-
-          <button className="btn-primary" disabled={busy} type="submit">
-            {busy
-              ? "Working…"
-              : mode === "password"
-                ? "Sign in"
-                : "Email me a login link"}
-          </button>
+          <div className="field"><label htmlFor="email">Work email</label><input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+          {mode === "password" && <div className="field"><label htmlFor="password">Password</label><input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>}
+          <button className="btn-primary" disabled={busy} type="submit">{busy ? "Working…" : mode === "password" ? "Sign in" : "Email me a login link"}</button>
         </form>
-
         <div className="auth-alt">
-          {mode === "password" ? (
-            <>
-              No password yet or forgot it?{" "}
-              <button onClick={() => setMode("magic")}>
-                Use an email login link
-              </button>
-            </>
-          ) : (
-            <button onClick={() => setMode("password")}>
-              Sign in with a password instead
-            </button>
-          )}
+          {mode === "password" ? <button onClick={() => setMode("magic")}>Use an email login link</button> : <button onClick={() => setMode("password")}>Sign in with password</button>}
         </div>
       </div>
     </div>
