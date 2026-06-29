@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import type { Profile, Role } from "../lib/types";
 import Topbar from "../components/Topbar";
+import AdminAccessEditor from "./AdminAccessEditor";
 
 function normalizeRole(role: string | null | undefined): Role {
   if (role === "rep") return "sales_rep";
@@ -145,51 +146,54 @@ export default function AdminAccess({ session }: { session: Session }) {
         {!loading && !isAdmin && <div className="notice">Only admins can preview users and access scopes.</div>}
 
         {!loading && isAdmin && (
-          <div className="grid two">
-            <section className="card access-card">
-              <h3>People</h3>
-              <div className="tablewrap">
-                <table className="deals adj">
-                  <thead>
-                    <tr><th>Name</th><th>Role</th><th>Store</th><th></th></tr>
-                  </thead>
-                  <tbody>
-                    {profiles.map((profile) => (
-                      <tr key={profile.id}>
-                        <td>{profileName(profile)}<div className="muted">{profile.email}</div></td>
-                        <td>{roleLabel(profile.role)}</td>
-                        <td>{profile.store_name ?? "All or scoped"}</td>
-                        <td className="r"><button className="btn-primary slim" onClick={() => setSelectedUserId(profile.id)}>Manage</button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            <section className="card access-card">
-              <h3>Preview</h3>
-              {selectedProfile ? (
-                <div className="access-pane">
-                  <div className="access-summary">
-                    <div><span>User</span><strong>{profileName(selectedProfile)}</strong></div>
-                    <div><span>Role</span><strong>{roleLabel(selectedProfile.role)}</strong></div>
-                  </div>
-                  <div className="notice">Effective scope: {effectiveScope(selectedProfile)}</div>
-                  <h4>Store access</h4>
-                  <div className="scope-list">
-                    {effectiveStores.length === 0 && <div className="scope-item muted">No store scope.</div>}
-                    {effectiveStores.map((store, idx) => <div className="scope-item" key={`${store}-${idx}`}><strong>{store}</strong></div>)}
-                  </div>
-                  <h4>Brand access</h4>
-                  <div className="scope-list">
-                    {selectedBrandAccess.length === 0 && <div className="scope-item muted">No brand scope.</div>}
-                    {selectedBrandAccess.map((row, idx) => <div className="scope-item" key={`${row.user_id}-brand-${idx}`}><strong>{row.brand || "Brand"}</strong><span>{row.stores?.name || row.store_id || "Store"}</span></div>)}
-                  </div>
+          <>
+            <AdminAccessEditor profile={selectedProfile} onSaved={async () => { window.location.reload(); }} />
+            <div className="grid two">
+              <section className="card access-card">
+                <h3>People</h3>
+                <div className="tablewrap">
+                  <table className="deals adj">
+                    <thead>
+                      <tr><th>Name</th><th>Role</th><th>Store</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                      {profiles.map((profile) => (
+                        <tr key={profile.id}>
+                          <td>{profileName(profile)}<div className="muted">{profile.email}</div></td>
+                          <td>{roleLabel(profile.role)}</td>
+                          <td>{profile.store_name ?? "All or scoped"}</td>
+                          <td className="r"><button className="btn-primary slim" onClick={() => setSelectedUserId(profile.id)}>Manage</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ) : <div className="empty">Select a user to preview their profile and permissions.</div>}
-            </section>
-          </div>
+              </section>
+
+              <section className="card access-card">
+                <h3>Preview</h3>
+                {selectedProfile ? (
+                  <div className="access-pane">
+                    <div className="access-summary">
+                      <div><span>User</span><strong>{profileName(selectedProfile)}</strong></div>
+                      <div><span>Role</span><strong>{roleLabel(selectedProfile.role)}</strong></div>
+                    </div>
+                    <div className="notice">Effective scope: {effectiveScope(selectedProfile)}</div>
+                    <h4>Store access</h4>
+                    <div className="scope-list">
+                      {effectiveStores.length === 0 && <div className="scope-item muted">No store scope.</div>}
+                      {effectiveStores.map((store, idx) => <div className="scope-item" key={`${store}-${idx}`}><strong>{store}</strong></div>)}
+                    </div>
+                    <h4>Brand access</h4>
+                    <div className="scope-list">
+                      {selectedBrandAccess.length === 0 && <div className="scope-item muted">No brand scope.</div>}
+                      {selectedBrandAccess.map((row, idx) => <div className="scope-item" key={`${row.user_id}-brand-${idx}`}><strong>{row.brand || "Brand"}</strong><span>{row.stores?.name || row.store_id || "Store"}</span></div>)}
+                    </div>
+                  </div>
+                ) : <div className="empty">Select a user to preview their profile and permissions.</div>}
+              </section>
+            </div>
+          </>
         )}
       </main>
     </>
