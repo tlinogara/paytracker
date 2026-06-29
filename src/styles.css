@@ -196,3 +196,28 @@ table.deals th button.sort.active .arrow { opacity: 1; color: var(--green); }
   gap: 8px;
   white-space: nowrap;
 }
+
+/* ---------- Bonus approvals overrides ---------- */
+.bonus-rule-form {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: end;
+  overflow-x: auto;
+}
+.bonus-rule-form .field { flex: 0 0 118px; }
+.bonus-rule-form .field.grow { flex: 0 0 300px; }
+.bonus-rule-form .field:nth-of-type(3) { flex-basis: 145px; }
+.bonus-rule-form .field:nth-of-type(4) { flex-basis: 78px; }
+.bonus-rule-form .field:nth-of-type(5) { flex-basis: 145px; }
+.bonus-rule-form .field:nth-of-type(6) { flex-basis: 88px; }
+.bonus-rule-form .field:nth-of-type(7),
+.bonus-rule-form .field:nth-of-type(8) { flex-basis: 84px; }
+.bonus-rule-form .btn-primary.slim { flex: 0 0 auto; grid-column: auto !important; }
+.group-row td {
+  display: grid;
+  grid-template-columns: minmax(120px, 16%) 1fr;
+  align-items: center;
+  column-gap: 10px;
+}
+.group-row td span { grid-column: 1; }
+.group-row td small { grid-column: 2; justify-self: start; margin-left: 0; }
