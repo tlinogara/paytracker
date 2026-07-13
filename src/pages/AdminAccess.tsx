@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import type { Profile, Role } from "../lib/types";
 import Topbar from "../components/Topbar";
-import AdminAccessEditor from "./AdminAccessEditor";
+import AdminAccessEditor, { type BrandAccessRow, type StoreAccessRow } from "./AdminAccessEditor";
 
 function normalizeRole(role: string | null | undefined): Role {
   if (role === "rep") return "sales_rep";
@@ -22,24 +22,6 @@ function roleLabel(role: string | null | undefined) {
   return normalized;
 }
 
-type StoreAccess = {
-  user_id: string;
-  store_id: string | null;
-  access_role: string | null;
-  active: boolean | null;
-  note: string | null;
-  stores?: { name: string | null } | null;
-};
-
-type BrandAccess = {
-  user_id: string;
-  store_id: string | null;
-  brand: string | null;
-  active: boolean | null;
-  note: string | null;
-  stores?: { name: string | null } | null;
-};
-
 function profileName(profile: Profile) {
   return profile.full_name || profile.rep_name || profile.email || "Unnamed user";
 }
@@ -47,20 +29,65 @@ function profileName(profile: Profile) {
 export default function AdminAccess({ session }: { session: Session }) {
   const [self, setSelf] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [storeAccess, setStoreAccess] = useState<StoreAccess[]>([]);
-  const [brandAccess, setBrandAccess] = useState<BrandAccess[]>([]);
+  const [storeAccess, setStoreAccess] = useState<StoreAccessRow[]>([]);
+  const [brandAccess, setBrandAccess] = useState<BrandAccessRow[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setErr(null);
+
+    const selfRes = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
+    if (selfRes.error) {
+      setErr(selfRes.error.message);
+      setLoading(false);
+      return;
+    }
+
+    const selfProfile = selfRes.data as Profile;
+    setSelf(selfProfile);
+
+    if (normalizeRole(selfProfile.role) !== "admin") {
+      setLoading(false);
+      return;
+    }
+
+    const [profilesRes, storeRes, brandRes] = await Promise.all([
+      supabase.from("profiles").select("id,email,full_name,role,employee_id,store_id,rep_name,store_name").order("full_name", { ascending: true }),
+      supabase.from("user_store_access").select("id,user_id,store_id,access_role,active,note,stores(name)").order("created_at", { ascending: false }),
+      supabase.from("user_brand_access").select("id,user_id,store_id,brand,active,note,stores(name)").order("brand", { ascending: true }),
+    ]);
+
+    if (profilesRes.error) setErr(profilesRes.error.message);
+    if (storeRes.error) setErr(storeRes.error.message);
+    if (brandRes.error) setErr(brandRes.error.message);
+
+    const nextProfiles = (profilesRes.data ?? []) as Profile[];
+    setProfiles(nextProfiles);
+    setStoreAccess((storeRes.data ?? []) as unknown as StoreAccessRow[]);
+    setBrandAccess((brandRes.data ?? []) as unknown as BrandAccessRow[]);
+    setSelectedUserId((current) => {
+      if (current && nextProfiles.some((profile) => profile.id === current)) return current;
+      return nextProfiles[0]?.id ?? null;
+    });
+    setLoading(false);
+  }, [session.user.id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   const selectedProfile = useMemo(
-    () => profiles.find((p) => p.id === selectedUserId) ?? null,
+    () => profiles.find((profile) => profile.id === selectedUserId) ?? null,
     [profiles, selectedUserId],
   );
 
   const selectedStoreAccess = useMemo(
     () => storeAccess.filter((row) => row.user_id === selectedUserId && row.active !== false),
-    [storeAccess, selectedUserId],
+    [selectedUserId, storeAccess],
   );
 
   const selectedBrandAccess = useMemo(
@@ -68,130 +95,133 @@ export default function AdminAccess({ session }: { session: Session }) {
     [brandAccess, selectedUserId],
   );
 
+  const filteredProfiles = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return profiles;
+    return profiles.filter((profile) => {
+      const searchable = `${profileName(profile)} ${profile.email} ${roleLabel(profile.role)} ${profile.store_name ?? ""}`.toLowerCase();
+      return searchable.includes(query);
+    });
+  }, [profiles, search]);
+
   const effectiveStores = useMemo(() => {
     const names = new Set<string>();
-    for (const row of selectedStoreAccess) names.add(row.stores?.name || row.note || row.store_id || "All locations");
-    for (const row of selectedBrandAccess) names.add(row.stores?.name || row.store_id || "Store");
     if (selectedProfile?.store_name) names.add(selectedProfile.store_name);
+    for (const row of selectedStoreAccess) names.add(row.stores?.name || row.note || "Assigned location");
+    for (const row of selectedBrandAccess) names.add(row.stores?.name || "Assigned location");
     return Array.from(names);
   }, [selectedBrandAccess, selectedProfile, selectedStoreAccess]);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setErr(null);
-
-      const selfRes = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
-      if (selfRes.error) {
-        setErr(selfRes.error.message);
-        setLoading(false);
-        return;
-      }
-
-      const selfProfile = selfRes.data as Profile;
-      setSelf(selfProfile);
-
-      if (normalizeRole(selfProfile.role) !== "admin") {
-        setLoading(false);
-        return;
-      }
-
-      const [profilesRes, storeRes, brandRes] = await Promise.all([
-        supabase.from("profiles").select("id,email,full_name,role,employee_id,store_id,rep_name,store_name").order("full_name", { ascending: true }),
-        supabase.from("user_store_access").select("user_id,store_id,access_role,active,note,stores(name)").order("created_at", { ascending: false }),
-        supabase.from("user_brand_access").select("user_id,store_id,brand,active,note,stores(name)").order("brand", { ascending: true }),
-      ]);
-
-      if (profilesRes.error) setErr(profilesRes.error.message);
-      else setProfiles((profilesRes.data ?? []) as Profile[]);
-
-      if (storeRes.error) setErr(storeRes.error.message);
-      else setStoreAccess((storeRes.data ?? []) as unknown as StoreAccess[]);
-
-      if (brandRes.error) setErr(brandRes.error.message);
-      else setBrandAccess((brandRes.data ?? []) as unknown as BrandAccess[]);
-
-      const firstProfile = (profilesRes.data ?? [])[0] as Profile | undefined;
-      if (firstProfile) setSelectedUserId(firstProfile.id);
-      setLoading(false);
-    }
-
-    load();
-  }, [session.user.id]);
-
-  const topbarProfile = self ?? ({ id: session.user.id, email: session.user.email ?? "", full_name: null, rep_name: null, store_name: null, employee_id: null, store_id: null, role: "admin" } as Profile);
-  const isAdmin = normalizeRole(self?.role) === "admin";
-
   function effectiveScope(profile: Profile | null) {
-    if (!profile) return "Select a user to preview access.";
+    if (!profile) return "Select a user to see their access.";
+
     const role = normalizeRole(profile.role);
-    if (role === "admin") return "All locations, all users, all settings, and access management.";
-    if (role === "payroll_manager") return "All locations, payroll review, imports, month close, and commission settings.";
-    if (role === "general_sales_manager") return effectiveStores.length ? effectiveStores.join(", ") : profile.store_name || "Assigned location.";
-    if (role === "brand_manager") return selectedBrandAccess.length ? selectedBrandAccess.map((row) => row.brand).filter(Boolean).join(", ") : "Assigned brand team.";
-    return profile.rep_name || profile.full_name || "Own deals and own pay breakdown.";
+    if (role === "admin") return "All locations, all users, and all settings.";
+    if (role === "payroll_manager") return "All locations, imports, month close, and commission rules.";
+    if (role === "general_sales_manager") {
+      return effectiveStores.length > 0 ? effectiveStores.join(", ") : "No location assigned yet.";
+    }
+    if (role === "brand_manager") {
+      const scopes = selectedBrandAccess.map((row) => `${row.brand || "Brand"} at ${row.stores?.name || "assigned location"}`);
+      return scopes.length > 0 ? scopes.join(", ") : "No brand access assigned yet.";
+    }
+    return profile.employee_id
+      ? `Own deals and commission for ${profile.rep_name || profile.full_name || "the linked salesperson"}.`
+      : "No salesperson is linked yet.";
   }
+
+  function directorySummary(profile: Profile) {
+    const role = normalizeRole(profile.role);
+    if (role === "admin" || role === "payroll_manager") return "All locations";
+    if (role === "sales_rep") return profile.employee_id ? "Linked" : "Needs salesperson link";
+    if (role === "brand_manager") {
+      const count = brandAccess.filter((row) => row.user_id === profile.id && row.active !== false).length;
+      return `${count} brand scope${count === 1 ? "" : "s"}`;
+    }
+    const extraCount = storeAccess.filter((row) => row.user_id === profile.id && row.active !== false).length;
+    return profile.store_name || (extraCount > 0 ? `${extraCount} location scope${extraCount === 1 ? "" : "s"}` : "Needs location");
+  }
+
+  const topbarProfile = self ?? ({
+    id: session.user.id,
+    email: session.user.email ?? "",
+    full_name: null,
+    rep_name: null,
+    store_name: null,
+    employee_id: null,
+    store_id: null,
+    role: "admin",
+  } as Profile);
+  const isAdmin = normalizeRole(self?.role) === "admin";
 
   return (
     <>
       <Topbar profile={topbarProfile} />
       <main className="page">
-        <div className="section-head">
-          <h2>Users and Access</h2>
-          <span className="count">admin preview</span>
-        </div>
+        <header className="page-heading">
+          <div>
+            <span className="eyebrow">Administration</span>
+            <h1>Users &amp; access</h1>
+            <p>Choose a user, assign the correct role, then add only the location or brand access that role needs.</p>
+          </div>
+          <div className="page-context">
+            <span>Accounts</span>
+            <strong>{profiles.length}</strong>
+          </div>
+        </header>
 
-        {err && <div className="notice">{err}</div>}
-        {loading && <div className="notice">Loading access data…</div>}
-        {!loading && !isAdmin && <div className="notice">Only admins can preview users and access scopes.</div>}
+        {err && <div className="notice">Could not load access data. {err}</div>}
+        {loading && <div className="notice">Loading users and permissions…</div>}
+        {!loading && !isAdmin && <div className="notice">Only admins can manage users and access.</div>}
 
         {!loading && isAdmin && (
           <>
-            <AdminAccessEditor profile={selectedProfile} onSaved={async () => { window.location.reload(); }} />
-            <div className="grid two">
-              <section className="card access-card">
-                <h3>People</h3>
-                <div className="tablewrap">
-                  <table className="deals adj">
-                    <thead>
-                      <tr><th>Name</th><th>Role</th><th>Store</th><th></th></tr>
-                    </thead>
-                    <tbody>
-                      {profiles.map((profile) => (
-                        <tr key={profile.id}>
-                          <td>{profileName(profile)}<div className="muted">{profile.email}</div></td>
-                          <td>{roleLabel(profile.role)}</td>
-                          <td>{profile.store_name ?? "All or scoped"}</td>
-                          <td className="r"><button className="btn-primary slim" onClick={() => setSelectedUserId(profile.id)}>Manage</button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+            <div className="access-help">
+              <strong>How to use this page</strong>
+              <span>Pick a person on the left. Save their role and account link first. Then add any extra location or brand scope shown for that role.</span>
+              <small>New login accounts are created through authentication. Once an account exists, it appears here for access setup.</small>
+            </div>
 
-              <section className="card access-card">
-                <h3>Preview</h3>
-                {selectedProfile ? (
-                  <div className="access-pane">
-                    <div className="access-summary">
-                      <div><span>User</span><strong>{profileName(selectedProfile)}</strong></div>
-                      <div><span>Role</span><strong>{roleLabel(selectedProfile.role)}</strong></div>
-                    </div>
-                    <div className="notice">Effective scope: {effectiveScope(selectedProfile)}</div>
-                    <h4>Store access</h4>
-                    <div className="scope-list">
-                      {effectiveStores.length === 0 && <div className="scope-item muted">No store scope.</div>}
-                      {effectiveStores.map((store, idx) => <div className="scope-item" key={`${store}-${idx}`}><strong>{store}</strong></div>)}
-                    </div>
-                    <h4>Brand access</h4>
-                    <div className="scope-list">
-                      {selectedBrandAccess.length === 0 && <div className="scope-item muted">No brand scope.</div>}
-                      {selectedBrandAccess.map((row, idx) => <div className="scope-item" key={`${row.user_id}-brand-${idx}`}><strong>{row.brand || "Brand"}</strong><span>{row.stores?.name || row.store_id || "Store"}</span></div>)}
-                    </div>
+            <div className="access-layout">
+              <aside className="user-directory" aria-label="Users">
+                <div className="directory-head">
+                  <div>
+                    <h2>People</h2>
+                    <span>{filteredProfiles.length} shown</span>
                   </div>
-                ) : <div className="empty">Select a user to preview their profile and permissions.</div>}
-              </section>
+                  <label className="search-field compact-search">
+                    <span>Find user</span>
+                    <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, email, role, or location" />
+                  </label>
+                </div>
+
+                <div className="directory-list">
+                  {filteredProfiles.map((profile) => (
+                    <button
+                      key={profile.id}
+                      className={`directory-user ${selectedUserId === profile.id ? "active" : ""}`}
+                      aria-pressed={selectedUserId === profile.id}
+                      onClick={() => setSelectedUserId(profile.id)}
+                    >
+                      <span className="directory-avatar" aria-hidden="true">{profileName(profile).charAt(0).toUpperCase()}</span>
+                      <span className="directory-copy">
+                        <strong>{profileName(profile)}</strong>
+                        <span>{profile.email}</span>
+                        <small>{roleLabel(profile.role)} · {directorySummary(profile)}</small>
+                      </span>
+                    </button>
+                  ))}
+                  {filteredProfiles.length === 0 && <div className="empty compact">No users match your search.</div>}
+                </div>
+              </aside>
+
+              <AdminAccessEditor
+                profile={selectedProfile}
+                storeAccess={selectedStoreAccess}
+                brandAccess={selectedBrandAccess}
+                scopeSummary={effectiveScope(selectedProfile)}
+                onSaved={loadData}
+              />
             </div>
           </>
         )}
