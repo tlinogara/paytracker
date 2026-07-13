@@ -11,6 +11,7 @@ import Adjustments from "../components/Adjustments";
 import Collapsible from "../components/Collapsible";
 
 const DEAL_COLUMNS = "*";
+type RepSort = "name" | "commission_pct" | "commission" | "units";
 
 function normalizedRole(role: string | null | undefined): string {
   if (role === "rep") return "sales_rep";
@@ -52,6 +53,7 @@ export default function Dashboard({ session }: { session: Session }) {
   const [lines, setLines] = useState<CommissionLine[]>([]);
   const [selectedRep, setSelectedRep] = useState<string | null>(null);
   const [repSearch, setRepSearch] = useState("");
+  const [repSort, setRepSort] = useState<RepSort>("commission");
   const [showAllReps, setShowAllReps] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dataErr, setDataErr] = useState<string | null>(null);
@@ -281,7 +283,29 @@ export default function Dashboard({ session }: { session: Session }) {
     return repRows.filter((row) => row.rep.toLowerCase().includes(query) || (row.dealer ?? "").toLowerCase().includes(query));
   }, [repRows, repSearch]);
 
-  const displayedRepRows = repSearch.trim() || showAllReps ? filteredRepRows : filteredRepRows.slice(0, 8);
+  const sortedRepRows = useMemo(() => {
+    const rows = [...filteredRepRows];
+    rows.sort((left, right) => {
+      if (repSort === "name") return left.rep.localeCompare(right.rep);
+
+      const leftValue = repSort === "commission_pct"
+        ? left.total_commission_pct ?? Number.NEGATIVE_INFINITY
+        : repSort === "units"
+          ? left.units ?? 0
+          : left.total_commission ?? 0;
+      const rightValue = repSort === "commission_pct"
+        ? right.total_commission_pct ?? Number.NEGATIVE_INFINITY
+        : repSort === "units"
+          ? right.units ?? 0
+          : right.total_commission ?? 0;
+
+      if (leftValue !== rightValue) return rightValue - leftValue;
+      return left.rep.localeCompare(right.rep);
+    });
+    return rows;
+  }, [filteredRepRows, repSort]);
+
+  const displayedRepRows = repSearch.trim() || showAllReps ? sortedRepRows : sortedRepRows.slice(0, 8);
   const fgsByRep = useMemo(() => {
     const result = new Map<string, number>();
     for (const row of repRows) result.set(row.rep, row.front_gross_share ?? 0);
@@ -403,9 +427,20 @@ export default function Dashboard({ session }: { session: Session }) {
                   <span>Find salesperson</span>
                   <input value={repSearch} onChange={(event) => setRepSearch(event.target.value)} placeholder="Search by name or location" />
                 </label>
-                {selectedRep && (
-                  <button className="btn-secondary" onClick={() => setSelectedRep(null)}>Show full team</button>
-                )}
+                <div className="team-actions">
+                  <div className="rep-sort" aria-label="Sort salespeople">
+                    <span>Sort by</span>
+                    <div className="rep-sort-options">
+                      <button className={`fchip ${repSort === "name" ? "active" : ""}`} aria-pressed={repSort === "name"} onClick={() => setRepSort("name")}>Name</button>
+                      <button className={`fchip ${repSort === "commission_pct" ? "active" : ""}`} aria-pressed={repSort === "commission_pct"} onClick={() => setRepSort("commission_pct")}>Commission %</button>
+                      <button className={`fchip ${repSort === "commission" ? "active" : ""}`} aria-pressed={repSort === "commission"} onClick={() => setRepSort("commission")}>Commission $</button>
+                      <button className={`fchip ${repSort === "units" ? "active" : ""}`} aria-pressed={repSort === "units"} onClick={() => setRepSort("units")}>Units</button>
+                    </div>
+                  </div>
+                  {selectedRep && (
+                    <button className="btn-secondary" onClick={() => setSelectedRep(null)}>Show full team</button>
+                  )}
+                </div>
               </div>
 
               {displayedRepRows.length > 0 ? (
