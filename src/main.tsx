@@ -4,6 +4,7 @@ import App from "./App";
 import "./styles.css";
 import "./enhancer-layout.css";
 import "./commission-page.css";
+import "./calculation-rules.css";
 import "./admin-access.css";
 import "./commission-audit-sort";
 
