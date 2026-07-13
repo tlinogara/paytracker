@@ -3,7 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { useMonth } from "../lib/useMonth";
 import { supabase } from "../lib/supabase";
 import type { Adjustment, CommissionLine, DealRow, Profile, RepMtd } from "../lib/types";
-import { isNewStock, money, moneyExact, monthLabel, monthStartISO, nextMonthISO, units } from "../lib/format";
+import { isNewStock, money, moneyExact, monthLabel, monthStartISO, nextMonthISO, percent, units } from "../lib/format";
 import Topbar from "../components/Topbar";
 import MonthBar from "../components/MonthBar";
 import DealsTable from "../components/DealsTable";
@@ -36,6 +36,7 @@ function emptyRepRow(rep: string, month: string): RepMtd {
     used_units: 0,
     front_gross_share: 0,
     total_commission: 0,
+    total_commission_pct: null,
     split_deals: 0,
   };
 }
@@ -225,6 +226,7 @@ export default function Dashboard({ session }: { session: Session }) {
         used_units: (row.used_units ?? 0) || fallback?.used_units || 0,
         front_gross_share: (row.front_gross_share ?? 0) || fallback?.front_gross_share || 0,
         total_commission: (row.total_commission ?? 0) || fallback?.total_commission || 0,
+        total_commission_pct: row.total_commission_pct ?? fallback?.total_commission_pct ?? null,
         split_deals: (row.split_deals ?? 0) || fallback?.split_deals || 0,
       });
     }
@@ -244,6 +246,23 @@ export default function Dashboard({ session }: { session: Session }) {
     const dealCommission = visibleDeals.reduce((total, deal) => total + (deal.rep_commission ?? 0), 0);
     const sum = (field: (row: RepMtd) => number | null) => rows.reduce((total, row) => total + (field(row) ?? 0), 0);
     const summaryCommission = sum((row) => row.total_commission);
+    const rowsWithRates = rows.filter((row) => row.total_commission_pct != null);
+    const totalRateWeight = rowsWithRates.reduce(
+      (total, row) => total + Math.max(row.front_gross_share ?? 0, 0),
+      0,
+    );
+    const weightedRate = rowsWithRates.reduce(
+      (total, row) => total + (row.total_commission_pct ?? 0) * Math.max(row.front_gross_share ?? 0, 0),
+      0,
+    );
+    const averageRate = rowsWithRates.length > 0
+      ? rowsWithRates.reduce((total, row) => total + (row.total_commission_pct ?? 0), 0) / rowsWithRates.length
+      : null;
+    const commissionPct = rows.length === 1
+      ? rows[0].total_commission_pct
+      : totalRateWeight > 0
+        ? weightedRate / totalRateWeight
+        : averageRate;
 
     return {
       units: sum((row) => row.units),
@@ -251,6 +270,7 @@ export default function Dashboard({ session }: { session: Session }) {
       usedUnits: sum((row) => row.used_units),
       frontGross: sum((row) => row.front_gross_share),
       commission: summaryCommission || dealCommission,
+      commissionPct,
       reps: rows.length,
     };
   }, [allDeals, isSalesRep, repRows, selectedRep]);
@@ -339,6 +359,13 @@ export default function Dashboard({ session }: { session: Session }) {
               <div className="v">{moneyExact(scoped.commission)}</div>
             </div>
             <div className="cell">
+              <div className="k">Total commission %</div>
+              <div className="v">
+                {percent(scoped.commissionPct)}
+                <small>{scoped.reps > 1 && !selectedRep && !isSalesRep ? "gross weighted team rate" : "eligible rate"}</small>
+              </div>
+            </div>
+            <div className="cell">
               <div className="k">Total units</div>
               <div className="v">{units(scoped.units)}</div>
             </div>
@@ -393,6 +420,7 @@ export default function Dashboard({ session }: { session: Session }) {
                       <span className="name">{row.rep}</span>
                       <span className="team-location">{row.dealer || "Location not assigned"}</span>
                       <span className="meta">{units(row.units)} units · <b>{money(row.total_commission)}</b></span>
+                      <span className="meta commission-rate">Total commission % · <b>{percent(row.total_commission_pct)}</b></span>
                     </button>
                   ))}
                 </div>
