@@ -49,6 +49,7 @@ export interface RepMtd {
   used_units: number | null;
   front_gross_share: number | null;
   total_commission: number | null;
+  total_commission_pct: number | null;
   split_deals: number | null;
 }
 
