@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import type { Profile } from "../lib/types";
 import { useMonthLink } from "../lib/useMonth";
@@ -25,20 +25,21 @@ export default function Topbar({ profile }: { profile: Profile | null }) {
   const canPayroll = ["payroll_manager", "admin"].includes(role);
   const canAdmin = role === "admin";
   const monthLink = useMonthLink();
+  const navClass = ({ isActive }: { isActive: boolean }) => `btn-ghost${isActive ? " active" : ""}`;
 
   return (
     <header className="topbar">
-      <Link to={monthLink("/")} className="wordmark">
+      <NavLink to={monthLink("/")} className="wordmark">
         Pay<span>Track</span>
-      </Link>
-      <nav className="topbar-user">
-        <Link className="btn-ghost" to={monthLink("/")}>Month Summary</Link>
-        {canManage && <Link className="btn-ghost" to={monthLink("/enhancers")}>Bonus Approvals</Link>}
-        {canManage && <Link className="btn-ghost" to={monthLink("/brand-reps")}>Team Setup</Link>}
-        {canPayroll && <Link className="btn-ghost" to={monthLink("/imports")}>Import Status</Link>}
-        {canPayroll && <Link className="btn-ghost" to={monthLink("/payroll")}>Month Close</Link>}
-        {canPayroll && <Link className="btn-ghost" to={monthLink("/calculations")}>Commission Settings</Link>}
-        {canAdmin && <Link className="btn-ghost" to={monthLink("/admin-access")}>Users and Access</Link>}
+      </NavLink>
+      <nav className="topbar-user" aria-label="Primary navigation">
+        <NavLink className={navClass} to={monthLink("/")} end>Commissions</NavLink>
+        {canManage && <NavLink className={navClass} to={monthLink("/enhancers")}>Bonus review</NavLink>}
+        {canManage && <NavLink className={navClass} to={monthLink("/brand-reps")}>Team setup</NavLink>}
+        {canPayroll && <NavLink className={navClass} to={monthLink("/imports")}>Imports</NavLink>}
+        {canPayroll && <NavLink className={navClass} to={monthLink("/payroll")}>Month close</NavLink>}
+        {canPayroll && <NavLink className={navClass} to={monthLink("/calculations")}>Commission rules</NavLink>}
+        {canAdmin && <NavLink className={navClass} to={monthLink("/admin-access")}>Users &amp; access</NavLink>}
         <span className="who">
           {profile?.full_name || profile?.email || "Signed in"}
           {role !== "sales_rep" ? ` · ${roleLabel(role)}` : ""}
