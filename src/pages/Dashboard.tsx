@@ -101,6 +101,51 @@ export default function Dashboard({ session }: { session: Session }) {
       dealsQuery = dealsQuery.eq("employee_id", profile.employee_id);
       adjustmentQuery = adjustmentQuery.eq("employee_id", profile.employee_id);
       lineQuery = lineQuery.eq("employee_id", profile.employee_id);
+    } else {
+      let teamAssignmentQuery = supabase
+        .from("brand_rep_classifications")
+        .select("employee_id")
+        .eq("active", true);
+
+      if (role === "general_sales_manager" && profile.store_id) {
+        teamAssignmentQuery = teamAssignmentQuery.eq("store_id", profile.store_id);
+      }
+
+      const { data: teamAssignments, error: teamAssignmentError } = await teamAssignmentQuery;
+      if (teamAssignmentError) {
+        setDataErr(`Could not load Team Setup assignments. ${teamAssignmentError.message}`);
+        setMtd([]);
+        setAllDeals([]);
+        setDeals([]);
+        setAdjustments([]);
+        setLines([]);
+        setLoading(false);
+        return;
+      }
+
+      const assignedEmployeeIds = Array.from(
+        new Set(
+          ((teamAssignments ?? []) as { employee_id: string | null }[])
+            .map((row) => row.employee_id)
+            .filter((employeeId): employeeId is string => Boolean(employeeId)),
+        ),
+      );
+
+      if (assignedEmployeeIds.length === 0) {
+        setMtd([]);
+        setAllDeals([]);
+        setDeals([]);
+        setAdjustments([]);
+        setLines([]);
+        setLoading(false);
+        return;
+      }
+
+      mtdQuery = mtdQuery.in("employee_id", assignedEmployeeIds);
+      allDealsQuery = allDealsQuery.in("employee_id", assignedEmployeeIds);
+      dealsQuery = dealsQuery.in("employee_id", assignedEmployeeIds);
+      adjustmentQuery = adjustmentQuery.in("employee_id", assignedEmployeeIds);
+      lineQuery = lineQuery.in("employee_id", assignedEmployeeIds);
     }
 
     if (selectedRep && !isSalesRep) {
@@ -133,7 +178,7 @@ export default function Dashboard({ session }: { session: Session }) {
     else setLines((lineRes.data ?? []) as CommissionLine[]);
 
     setLoading(false);
-  }, [isSalesRep, month, profile, selectedRep]);
+  }, [isSalesRep, month, profile, role, selectedRep]);
 
   useEffect(() => {
     loadData();
