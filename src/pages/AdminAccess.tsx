@@ -31,6 +31,7 @@ export default function AdminAccess({ session }: { session: Session }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [storeAccess, setStoreAccess] = useState<StoreAccessRow[]>([]);
   const [brandAccess, setBrandAccess] = useState<BrandAccessRow[]>([]);
+  const [storeNames, setStoreNames] = useState<Record<string, string>>({});
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -55,20 +56,26 @@ export default function AdminAccess({ session }: { session: Session }) {
       return;
     }
 
-    const [profilesRes, storeRes, brandRes] = await Promise.all([
+    const [profilesRes, storeAccessRes, brandRes, storesRes] = await Promise.all([
       supabase.from("profiles").select("id,email,full_name,role,employee_id,store_id,rep_name,store_name").order("full_name", { ascending: true }),
       supabase.from("user_store_access").select("id,user_id,store_id,access_role,active,note,stores(name)").order("created_at", { ascending: false }),
       supabase.from("user_brand_access").select("id,user_id,store_id,brand,active,note,stores(name)").order("brand", { ascending: true }),
+      supabase.from("stores").select("id,name").order("name"),
     ]);
 
     if (profilesRes.error) setErr(profilesRes.error.message);
-    if (storeRes.error) setErr(storeRes.error.message);
+    if (storeAccessRes.error) setErr(storeAccessRes.error.message);
     if (brandRes.error) setErr(brandRes.error.message);
+    if (storesRes.error) setErr(storesRes.error.message);
 
     const nextProfiles = (profilesRes.data ?? []) as Profile[];
+    const nextStoreNames: Record<string, string> = {};
+    for (const store of storesRes.data ?? []) nextStoreNames[store.id] = store.name;
+
     setProfiles(nextProfiles);
-    setStoreAccess((storeRes.data ?? []) as unknown as StoreAccessRow[]);
+    setStoreAccess((storeAccessRes.data ?? []) as unknown as StoreAccessRow[]);
     setBrandAccess((brandRes.data ?? []) as unknown as BrandAccessRow[]);
+    setStoreNames(nextStoreNames);
     setSelectedUserId((current) => {
       if (current && nextProfiles.some((profile) => profile.id === current)) return current;
       return nextProfiles[0]?.id ?? null;
@@ -99,18 +106,21 @@ export default function AdminAccess({ session }: { session: Session }) {
     const query = search.trim().toLowerCase();
     if (!query) return profiles;
     return profiles.filter((profile) => {
-      const searchable = `${profileName(profile)} ${profile.email} ${roleLabel(profile.role)} ${profile.store_name ?? ""}`.toLowerCase();
+      const primaryStore = profile.store_name || (profile.store_id ? storeNames[profile.store_id] : "") || "";
+      const searchable = `${profileName(profile)} ${profile.email} ${roleLabel(profile.role)} ${primaryStore}`.toLowerCase();
       return searchable.includes(query);
     });
-  }, [profiles, search]);
+  }, [profiles, search, storeNames]);
 
   const effectiveStores = useMemo(() => {
     const names = new Set<string>();
-    if (selectedProfile?.store_name) names.add(selectedProfile.store_name);
+    const primaryStore = selectedProfile?.store_name
+      || (selectedProfile?.store_id ? storeNames[selectedProfile.store_id] : null);
+    if (primaryStore) names.add(primaryStore);
     for (const row of selectedStoreAccess) names.add(row.stores?.name || row.note || "Assigned location");
     for (const row of selectedBrandAccess) names.add(row.stores?.name || "Assigned location");
     return Array.from(names);
-  }, [selectedBrandAccess, selectedProfile, selectedStoreAccess]);
+  }, [selectedBrandAccess, selectedProfile, selectedStoreAccess, storeNames]);
 
   function effectiveScope(profile: Profile | null) {
     if (!profile) return "Select a user to see their access.";
@@ -139,7 +149,8 @@ export default function AdminAccess({ session }: { session: Session }) {
       return `${count} brand scope${count === 1 ? "" : "s"}`;
     }
     const extraCount = storeAccess.filter((row) => row.user_id === profile.id && row.active !== false).length;
-    return profile.store_name || (extraCount > 0 ? `${extraCount} location scope${extraCount === 1 ? "" : "s"}` : "Needs location");
+    const primaryStore = profile.store_name || (profile.store_id ? storeNames[profile.store_id] : null);
+    return primaryStore || (extraCount > 0 ? `${extraCount} location scope${extraCount === 1 ? "" : "s"}` : "Needs location");
   }
 
   const topbarProfile = self ?? ({
