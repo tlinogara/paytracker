@@ -1,5 +1,36 @@
-const NEGATIVE_CURRENCY = /[-−]\s*\$/;
+const NEGATIVE_SIGN = /[-−–—﹣－]\s*\$/u;
+const ACCOUNTING_NEGATIVE = /\(\s*\$\s*[\d,]+(?:\.\d+)?\s*\)/u;
 const EMPTY_MARKER = "pending-approvals-empty";
+
+function containsNegativeCurrency(value: string): boolean {
+  return NEGATIVE_SIGN.test(value) || ACCOUNTING_NEGATIVE.test(value);
+}
+
+function proposedAmountText(card: HTMLElement): string {
+  const approveButton = card.querySelector<HTMLElement>(".btn-approve");
+  if (approveButton?.textContent) return approveButton.textContent;
+
+  const explanation = card.querySelector<HTMLElement>(".why");
+  if (explanation?.textContent) {
+    const text = explanation.textContent;
+    const equalsIndex = text.lastIndexOf("=");
+    if (equalsIndex >= 0) return text.slice(equalsIndex + 1);
+    return text;
+  }
+
+  return card.textContent ?? "";
+}
+
+function setCardVisible(card: HTMLElement, visible: boolean): void {
+  card.dataset.pendingApprovalVisible = visible ? "true" : "false";
+  if (visible) {
+    card.style.removeProperty("display");
+    card.removeAttribute("aria-hidden");
+  } else {
+    card.style.setProperty("display", "none", "important");
+    card.setAttribute("aria-hidden", "true");
+  }
+}
 
 function syncPendingApprovals(): void {
   document.querySelectorAll<HTMLElement>(".pend-list").forEach((list) => {
@@ -9,8 +40,8 @@ function syncPendingApprovals(): void {
 
     const cards = Array.from(list.querySelectorAll<HTMLElement>(":scope > .pend-card"));
     const visibleCards = cards.filter((card) => {
-      const isNegative = NEGATIVE_CURRENCY.test(card.textContent ?? "");
-      if (card.hidden !== isNegative) card.hidden = isNegative;
+      const isNegative = containsNegativeCurrency(proposedAmountText(card));
+      setCardVisible(card, !isNegative);
       return !isNegative;
     });
 
@@ -20,10 +51,7 @@ function syncPendingApprovals(): void {
         const bName = b.querySelector<HTMLElement>(".name")?.textContent?.trim() ?? "";
         return aName.localeCompare(bName, undefined, { sensitivity: "base", numeric: true });
       })
-      .forEach((card, index) => {
-        const order = String(index);
-        if (card.style.order !== order) card.style.order = order;
-      });
+      .forEach((card) => list.appendChild(card));
 
     const count = section.querySelector<HTMLElement>(".section-toggle .count");
     const nextCount = `${visibleCards.length} qualified, unpaid`;
@@ -34,7 +62,7 @@ function syncPendingApprovals(): void {
 
     const existingEmpty = body.querySelector<HTMLElement>(`[data-ui-marker="${EMPTY_MARKER}"]`);
     if (visibleCards.length === 0 && cards.length > 0) {
-      list.hidden = true;
+      list.style.setProperty("display", "none", "important");
       if (!existingEmpty) {
         const wrapper = document.createElement("div");
         wrapper.className = "tablewrap";
@@ -47,7 +75,7 @@ function syncPendingApprovals(): void {
         body.appendChild(wrapper);
       }
     } else {
-      list.hidden = false;
+      list.style.removeProperty("display");
       existingEmpty?.remove();
     }
   });
