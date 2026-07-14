@@ -12,6 +12,11 @@ const usdCents = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
+const commissionPercent = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
 const pacificDateTime = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/Los_Angeles",
   year: "numeric",
@@ -30,6 +35,11 @@ export function money(n: number | null | undefined): string {
 export function moneyExact(n: number | null | undefined): string {
   if (n == null) return "—";
   return usdCents.format(n);
+}
+
+export function percent(n: number | null | undefined): string {
+  if (n == null) return "—";
+  return `${commissionPercent.format(n)}%`;
 }
 
 export function units(n: number | null | undefined): string {

@@ -133,10 +133,12 @@ table.deals-main .split-col { width: 54px; }
 .btn-approve:hover { background: #174a36; }
 
 .adj-form { display: grid; grid-template-columns: 1.2fr 0.9fr 0.7fr 0.7fr 0.9fr 1.4fr auto; gap: 10px; align-items: end; background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 14px; margin-top: 8px; }
-.adj-form .field { margin-bottom: 0; }
+.adj-form .field { margin-bottom: 0; min-width: 0; }
 .field.grow { min-width: 0; }
 .stock-form { grid-template-columns: 1fr auto auto; }
 .buy-fee-form { grid-template-columns: 1fr 1fr 1fr auto; }
+.bonus-rule-form { grid-template-columns: minmax(120px, 0.8fr) minmax(220px, 2fr) minmax(130px, 0.9fr) minmax(72px, 0.45fr) minmax(128px, 0.85fr) minmax(76px, 0.45fr) minmax(76px, 0.45fr) minmax(76px, 0.45fr) auto; overflow-x: auto; }
+@media (max-width: 1200px) { .bonus-rule-form { grid-template-columns: repeat(4, minmax(0, 1fr)); } .bonus-rule-form .field.grow, .bonus-rule-form .btn-primary.slim { grid-column: 1 / -1; } }
 @media (max-width: 1000px) { .adj-form, .stock-form, .buy-fee-form { grid-template-columns: 1fr 1fr; } .adj-form .field.grow, .adj-form .btn-primary.slim, .buy-fee-form .btn-primary.slim { grid-column: 1 / -1; } }
 
 .brand-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
@@ -194,3 +196,28 @@ table.deals th button.sort.active .arrow { opacity: 1; color: var(--green); }
   gap: 8px;
   white-space: nowrap;
 }
+
+/* ---------- Bonus approvals overrides ---------- */
+.bonus-rule-form {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: end;
+  overflow-x: auto;
+}
+.bonus-rule-form .field { flex: 0 0 118px; }
+.bonus-rule-form .field.grow { flex: 0 0 300px; }
+.bonus-rule-form .field:nth-of-type(3) { flex-basis: 145px; }
+.bonus-rule-form .field:nth-of-type(4) { flex-basis: 78px; }
+.bonus-rule-form .field:nth-of-type(5) { flex-basis: 145px; }
+.bonus-rule-form .field:nth-of-type(6) { flex-basis: 88px; }
+.bonus-rule-form .field:nth-of-type(7),
+.bonus-rule-form .field:nth-of-type(8) { flex-basis: 84px; }
+.bonus-rule-form .btn-primary.slim { flex: 0 0 auto; grid-column: auto !important; }
+.group-row td {
+  display: grid;
+  grid-template-columns: minmax(120px, 16%) 1fr;
+  align-items: center;
+  column-gap: 10px;
+}
+.group-row td span { grid-column: 1; }
+.group-row td small { grid-column: 2; justify-self: start; margin-left: 0; }

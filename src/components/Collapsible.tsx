@@ -11,9 +11,10 @@ export default function Collapsible({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(true);
+
   return (
     <section className="collapsible">
-      <button className="section-head section-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+      <button className="section-head section-toggle" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
         <h2>
           <span className={`chev ${open ? "open" : ""}`} aria-hidden="true">
             ›

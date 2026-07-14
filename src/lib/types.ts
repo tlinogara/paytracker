@@ -1,4 +1,4 @@
-export type Role = "rep" | "manager" | "payroll" | "admin";
+export type Role = "rep" | "manager" | "payroll" | "admin" | "sales_rep" | "brand_manager" | "general_sales_manager" | "payroll_manager";
 
 export interface Store {
   id: string;
@@ -49,6 +49,7 @@ export interface RepMtd {
   used_units: number | null;
   front_gross_share: number | null;
   total_commission: number | null;
+  total_commission_pct: number | null;
   split_deals: number | null;
 }
 

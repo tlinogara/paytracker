@@ -1,18 +1,35 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { supabase } from "../lib/supabase";
-import type { Adjustment, AdjCategory, RepMtd } from "../lib/types";
+import type { Adjustment, RepMtd } from "../lib/types";
 import { moneyExact, shortDate } from "../lib/format";
 
-const CATEGORY_LABEL: Record<string, string> = {
-  spiff: "Spiff",
-  enhancer: "Enhancer",
-  enhanced_mini: "Enhanced Mini",
-  trade_spiff: "Trade Spiff",
-  buy_fee: "Buy Fee",
-  correction: "Correction",
-  other: "Other",
+type CategoryOption = {
+  key: string;
+  label: string;
+  default_amount: number | null;
+  default_pct: number | null;
+  active: boolean;
+  sort_order: number;
 };
+
+const FALLBACK_CATEGORIES: CategoryOption[] = [
+  { key: "spiff", label: "Spiff", default_amount: null, default_pct: null, active: true, sort_order: 10 },
+  { key: "enhancer", label: "Enhancer", default_amount: null, default_pct: null, active: true, sort_order: 20 },
+  { key: "enhanced_mini", label: "Enhanced Mini", default_amount: null, default_pct: null, active: true, sort_order: 30 },
+  { key: "trade_spiff", label: "Trade Spiff", default_amount: null, default_pct: null, active: true, sort_order: 40 },
+  { key: "buy_fee", label: "Buy Fee", default_amount: null, default_pct: null, active: true, sort_order: 50 },
+  { key: "correction", label: "Correction", default_amount: null, default_pct: null, active: true, sort_order: 60 },
+  { key: "draw", label: "Draw", default_amount: null, default_pct: null, active: true, sort_order: 70 },
+  { key: "prior_month", label: "Prior Month Adjustment", default_amount: null, default_pct: null, active: true, sort_order: 80 },
+  { key: "carryover", label: "Carryover", default_amount: null, default_pct: null, active: true, sort_order: 90 },
+  { key: "other", label: "Other", default_amount: null, default_pct: null, active: true, sort_order: 100 },
+];
+
+function numberInput(value: number | null | undefined): string {
+  if (value == null) return "";
+  return Number(value).toString();
+}
 
 export default function Adjustments({
   entries,
@@ -33,8 +50,9 @@ export default function Adjustments({
   selectedRep: string | null;
   onChanged: () => void;
 }) {
+  const [categories, setCategories] = useState<CategoryOption[]>(FALLBACK_CATEGORIES);
   const [rep, setRep] = useState(selectedRep ?? "");
-  const [category, setCategory] = useState<AdjCategory | string>("spiff");
+  const [category, setCategory] = useState("spiff");
   const [amount, setAmount] = useState("");
   const [pct, setPct] = useState("");
   const [dealNumber, setDealNumber] = useState("");
@@ -42,6 +60,40 @@ export default function Adjustments({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const repValue = selectedRep ?? rep;
+
+  useEffect(() => {
+    supabase
+      .from("adjustment_category_options")
+      .select("key,label,default_amount,default_pct,active,sort_order")
+      .eq("active", true)
+      .order("sort_order")
+      .then(({ data }) => {
+        const active = ((data ?? []) as CategoryOption[]).filter((row) => row.key && row.label);
+        if (active.length > 0) setCategories(active);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!categories.some((c) => c.key === category)) {
+      setCategory(categories[0]?.key ?? "other");
+    }
+  }, [categories, category]);
+
+  const categoryByKey = useMemo(() => new Map(categories.map((c) => [c.key, c])), [categories]);
+
+  function setCategoryAndDefaults(nextKey: string) {
+    setCategory(nextKey);
+    const next = categoryByKey.get(nextKey);
+    if (!next) return;
+    if (amount.trim() === "" && pct.trim() === "") {
+      setAmount(numberInput(next.default_amount));
+      setPct(numberInput(next.default_pct));
+    }
+  }
+
+  function categoryLabel(key: string): string {
+    return categoryByKey.get(key)?.label ?? FALLBACK_CATEGORIES.find((c) => c.key === key)?.label ?? key;
+  }
 
   function enhancerDollars(a: Adjustment): number {
     if (a.pct == null) return a.amount ?? 0;
@@ -127,6 +179,28 @@ export default function Adjustments({
   return (
     <>
       {err && <div className="notice">{err}</div>}
+      {canEdit && (
+        <form className="adj-form" onSubmit={add}>
+          <div className="field">
+            <label htmlFor="adj-rep">Salesperson</label>
+            <input id="adj-rep" list="rep-options" required value={repValue} onChange={(e) => setRep(e.target.value)} />
+            <datalist id="rep-options">
+              {reps.map((r) => <option key={r.rep} value={r.rep} />)}
+            </datalist>
+          </div>
+          <div className="field">
+            <label htmlFor="adj-cat">Type</label>
+            <select id="adj-cat" value={category} onChange={(e) => setCategoryAndDefaults(e.target.value)}>
+              {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+            </select>
+          </div>
+          <div className="field"><label htmlFor="adj-amt">Amount $</label><input id="adj-amt" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500 or -250" /></div>
+          <div className="field"><label htmlFor="adj-pct">or %</label><input id="adj-pct" inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="1.25" /></div>
+          <div className="field"><label htmlFor="adj-deal">Deal #</label><input id="adj-deal" value={dealNumber} onChange={(e) => setDealNumber(e.target.value)} /></div>
+          <div className="field grow"><label htmlFor="adj-note">Note</label><input id="adj-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason or source" /></div>
+          <button className="btn-primary slim" disabled={busy} type="submit">{busy ? "Saving…" : "Add entry"}</button>
+        </form>
+      )}
       {entries.length === 0 ? (
         <div className="tablewrap">
           <div className="empty">No manual entries for this month{selectedRep ? ` for ${selectedRep}` : ""}.</div>
@@ -151,7 +225,7 @@ export default function Adjustments({
                 return (
                   <tr key={a.id}>
                     <td>{a.rep}</td>
-                    <td><span className={`badge cat-${a.category}`}>{CATEGORY_LABEL[a.category] ?? a.category}</span></td>
+                    <td><span className={`badge cat-${a.category}`}>{categoryLabel(a.category)}</span></td>
                     <td className={`r money ${displayAmount < 0 ? "neg" : "pos"}`}>
                       {a.pct != null ? <>{a.pct}% <span className="deal-no">≈ {moneyExact(displayAmount)}</span></> : moneyExact(a.amount)}
                     </td>
@@ -165,34 +239,6 @@ export default function Adjustments({
             </tbody>
           </table>
         </div>
-      )}
-      {canEdit && (
-        <form className="adj-form" onSubmit={add}>
-          <div className="field">
-            <label htmlFor="adj-rep">Salesperson</label>
-            <input id="adj-rep" list="rep-options" required value={repValue} onChange={(e) => setRep(e.target.value)} />
-            <datalist id="rep-options">
-              {reps.map((r) => <option key={r.rep} value={r.rep} />)}
-            </datalist>
-          </div>
-          <div className="field">
-            <label htmlFor="adj-cat">Type</label>
-            <select id="adj-cat" value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="spiff">Spiff</option>
-              <option value="enhancer">Enhancer</option>
-              <option value="enhanced_mini">Enhanced Mini</option>
-              <option value="trade_spiff">Trade Spiff</option>
-              <option value="buy_fee">Buy Fee</option>
-              <option value="correction">Correction</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          <div className="field"><label htmlFor="adj-amt">Amount $</label><input id="adj-amt" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500 or -250" /></div>
-          <div className="field"><label htmlFor="adj-pct">or %</label><input id="adj-pct" inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="1.25" /></div>
-          <div className="field"><label htmlFor="adj-deal">Deal #</label><input id="adj-deal" value={dealNumber} onChange={(e) => setDealNumber(e.target.value)} /></div>
-          <div className="field grow"><label htmlFor="adj-note">Note</label><input id="adj-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason or source" /></div>
-          <button className="btn-primary slim" disabled={busy} type="submit">{busy ? "Saving…" : "Add entry"}</button>
-        </form>
       )}
     </>
   );

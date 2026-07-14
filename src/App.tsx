@@ -9,6 +9,7 @@ import BrandReps from "./pages/BrandReps";
 import Imports from "./pages/Imports";
 import Payroll from "./pages/Payroll";
 import Calculations from "./pages/Calculations";
+import AdminAccess from "./pages/AdminAccess";
 import UpdatePassword from "./pages/UpdatePassword";
 
 export default function App() {
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="/imports" element={session ? <Imports session={session} /> : <Navigate to="/login" replace />} />
         <Route path="/payroll" element={session ? <Payroll session={session} /> : <Navigate to="/login" replace />} />
         <Route path="/calculations" element={session ? <Calculations session={session} /> : <Navigate to="/login" replace />} />
+        <Route path="/admin-access" element={session ? <AdminAccess session={session} /> : <Navigate to="/login" replace />} />
         <Route path="/" element={session ? <Dashboard session={session} /> : <Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
