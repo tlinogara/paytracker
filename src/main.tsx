@@ -9,6 +9,7 @@ import "./calculation-rules.css";
 import "./admin-access.css";
 import "./team-setup.css";
 import "./commission-audit-sort";
+import "./pending-approvals-display";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
